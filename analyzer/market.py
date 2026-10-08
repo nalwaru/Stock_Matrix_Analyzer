@@ -27,7 +27,7 @@ def empty_quotes() -> pd.DataFrame:
 def _read(info, attr: str) -> float:
     try:
         value = float(getattr(info, attr))
-    except (AttributeError, KeyError, TypeError, ValueError):
+    except Exception:  # yfinance reads lazily: network errors surface here
         return math.nan
     return value if math.isfinite(value) and value > 0 else math.nan
 
@@ -58,4 +58,9 @@ def fetch_quotes_uncached(tickers: tuple[str, ...], yf_module=yfinance) -> pd.Da
 
 @st.cache_data(ttl=300, show_spinner="Fetching market data...")
 def fetch_quotes(tickers: tuple[str, ...]) -> pd.DataFrame:
-    return fetch_quotes_uncached(tickers)
+    """Cached for 5 minutes. A total failure returns empty quotes (also cached), so an
+    offline session does not re-hit the network on every rerun."""
+    try:
+        return fetch_quotes_uncached(tickers)
+    except MarketDataError:
+        return empty_quotes()

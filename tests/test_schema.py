@@ -69,3 +69,12 @@ def test_fractional_shares_and_zero_price_are_valid():
     result = validate(raw)
     assert result.warnings == []
     assert result.df["Shares"].tolist() == [0.25, 10.0]
+
+
+def test_mixed_timezone_dates_do_not_crash_validation():
+    raw = good_frame()
+    raw["Purchase_Date"] = ["2024-01-02T00:00:00+05:00", "2024-01-02"]
+    result = validate(raw)
+    assert result.errors == [] and result.warnings == []
+    assert len(result.df) == 2
+    assert result.df["Purchase_Date"].dt.tz is None

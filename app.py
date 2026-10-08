@@ -77,13 +77,15 @@ if filtered.empty:
 # ---------- market data ----------
 all_tickers = tuple(sorted(holdings["Ticker"].unique()))
 try:
-    quotes, stale = market.fetch_quotes(all_tickers), False
-except market.MarketDataError as exc:
-    st.error(f"Live market data is unavailable ({exc}). Showing purchase prices as stale values.")
-    quotes, stale = market.empty_quotes(), True
+    quotes = market.fetch_quotes(all_tickers)
+except market.MarketDataError:  # defensive: the cached wrapper normally returns empty
+    quotes = market.empty_quotes()
+stale = bool(quotes["Price"].isna().all())
+if stale:
+    st.error("Live market data is unavailable. Showing purchase prices as stale values.")
 
 enriched = portfolio.enrich(filtered, quotes, fallback_to_cost=stale)
-unavailable = enriched.loc[enriched["Price_Status"] == "unavailable", "Ticker"].tolist()
+unavailable = enriched.loc[enriched["Price_Status"] == "unavailable", "Ticker"].unique().tolist()
 if unavailable:
     st.warning(f"Price unavailable, excluded from totals: {', '.join(unavailable)}")
 

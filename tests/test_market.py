@@ -65,3 +65,30 @@ def test_empty_ticker_tuple_returns_empty_frame():
 
 def test_fetch_quotes_is_streamlit_cached():
     assert hasattr(market.fetch_quotes, "clear")
+
+
+def test_network_error_while_reading_quotes_becomes_market_data_error():
+    class Offline:
+        @property
+        def last_price(self):
+            raise OSError("Failed to connect")
+
+        previous_close = year_high = year_low = 1.0
+
+    with pytest.raises(market.MarketDataError):
+        market.fetch_quotes_uncached(("AAPL",), FakeYF({"AAPL": Offline()}))
+
+
+def test_cached_fetch_returns_empty_quotes_on_failure_so_failure_is_cached(monkeypatch):
+    calls = []
+
+    def boom(tickers):
+        calls.append(tickers)
+        raise market.MarketDataError("offline")
+
+    monkeypatch.setattr(market, "fetch_quotes_uncached", boom)
+    market.fetch_quotes.clear()
+    assert market.fetch_quotes(("AAPL",)).empty
+    assert market.fetch_quotes(("AAPL",)).empty
+    assert len(calls) == 1
+    market.fetch_quotes.clear()

@@ -43,7 +43,9 @@ def validate(raw: pd.DataFrame) -> ValidationResult:
     df["Asset_Class"] = _clean_text(df["Asset_Class"])
     df["Shares"] = pd.to_numeric(df["Shares"], errors="coerce")
     df["Purchase_Price"] = pd.to_numeric(df["Purchase_Price"], errors="coerce")
-    df["Purchase_Date"] = pd.to_datetime(df["Purchase_Date"], errors="coerce", format="mixed")
+    df["Purchase_Date"] = pd.to_datetime(
+        df["Purchase_Date"], errors="coerce", format="mixed", utc=True
+    ).dt.tz_localize(None)
 
     checks = {
         "missing ticker": df["Ticker"] == "",
