@@ -121,11 +121,11 @@ with tab_dash:
         left.plotly_chart(
             px.pie(alloc, names="Asset_Class", values="Current_Value", hole=0.5,
                    title="Allocation by Asset Class"),
-            use_container_width=True,
+            width="stretch",
         )
         right.plotly_chart(
             px.bar(top, x="Ticker", y="Current_Value", title="Top Holdings by Current Value"),
-            use_container_width=True,
+            width="stretch",
         )
     st.dataframe(
         enriched[[
@@ -134,7 +134,7 @@ with tab_dash:
             "Week52_Low", "Week52_High", "Price_Status",
         ]],
         hide_index=True,
-        use_container_width=True,
+        width="stretch",
         column_config={
             "Purchase_Price": st.column_config.NumberColumn(format="$%.2f"),
             "Purchase_Date": st.column_config.DateColumn(format="YYYY-MM-DD"),
