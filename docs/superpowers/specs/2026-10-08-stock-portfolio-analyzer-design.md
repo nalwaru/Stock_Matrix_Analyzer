@@ -19,7 +19,7 @@ server-side PDF generation.
 - **LLM provider:** OpenAI (`openai` SDK), replacing `google-genai` from story 1.1. Model is read
   from `OPENAI_MODEL` (one default in one place). Key from `OPENAI_API_KEY` (env or `.env`).
 - **Packaging:** `uv init --no-package stock-portfolio-analyzer`; dependencies `streamlit`,
-  `pandas`, `plotly`, `yfinance`, `openai` (+ dev: `pytest`) locked in `uv.lock`.
+  `pandas`, `plotly`, `yfinance`, `openai`, `python-dotenv` (+ dev: `pytest`) locked in `uv.lock`.
 - **Architecture:** layered modules; `app.py` is UI wiring only. Financial logic is pure
   (no Streamlit imports) and unit tested.
 - **Sample data:** `data/sample_portfolio.csv`, derived from the user-supplied
@@ -30,7 +30,7 @@ server-side PDF generation.
 
 ```
 app.py                    UI wiring (sidebar, KPIs, charts, tabs)
-src/analyzer/
+analyzer/
   schema.py               CSV validation
   market.py               yfinance adapter, @st.cache_data(ttl=300)
   portfolio.py            enrich(), allocation, top holdings
