@@ -62,6 +62,9 @@ def _ask_ai_app(monkeypatch, retrieve_impl, indexed=None):
     from analyzer import ai
     from rag import retrieve as rag_retrieve, store
 
+    import streamlit as st
+
+    st.cache_resource.clear()  # app caches the Pinecone client across runs
     monkeypatch.setattr(market, "fetch_quotes", fake_quotes)
     monkeypatch.setenv("OPENAI_API_KEY", "k")
     monkeypatch.setenv("PINECONE_API_KEY", "k")
@@ -115,3 +118,16 @@ def test_portfolio_without_indexed_filings_skips_retrieval(monkeypatch):
     assert not at.exception
     assert calls["passages"] is None
     assert any("filings" in c.value.lower() for c in at.caption)
+
+
+def test_pinecone_client_failure_falls_back_to_portfolio_only(monkeypatch):
+    import pinecone
+
+    def broken(*a, **k):
+        raise ValueError("bad api key format")
+
+    monkeypatch.setattr(pinecone, "Pinecone", broken)
+    at, calls = _ask_ai_app(monkeypatch, lambda *a, **k: [_passage()])
+    assert not at.exception
+    assert calls["passages"] is None
+    assert any("portfolio data only" in c.value for c in at.caption)

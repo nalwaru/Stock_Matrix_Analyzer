@@ -184,6 +184,8 @@ def filing_passages(question: str, df: pd.DataFrame):
         return rag_retrieve.retrieve(pinecone_client(), question, tickers, namespace), None
     except rag_retrieve.RetrievalError as exc:
         return None, f"{exc} This answer uses portfolio data only."
+    except Exception:  # noqa: BLE001 - e.g. client construction; never break the tab
+        return None, "Filing search is unavailable right now. This answer uses portfolio data only."
 
 
 def render_message(msg: dict) -> None:
