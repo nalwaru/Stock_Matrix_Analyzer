@@ -133,3 +133,40 @@ def test_request_caps_output_tokens():
     client = FakeClient()
     ai.chat_reply(SUMMARY, [], "q", "m", client=client)
     assert client.calls[0]["max_tokens"] == ai.MAX_OUTPUT_TOKENS
+
+
+def passage(text="Revenue fell 5% on weaker iPhone demand.", **kw):
+    from types import SimpleNamespace
+    base = dict(ticker="AAPL", form="8-K", filing_date="2026-10-01", section="Item 2", text=text)
+    return SimpleNamespace(**{**base, **kw})
+
+
+def test_messages_without_passages_unchanged():
+    assert ai.build_chat_messages(SUMMARY, [], "q") == ai.build_chat_messages(SUMMARY, [], "q", passages=None)
+    assert "Filing passages" not in ai.build_chat_messages(SUMMARY, [], "q")[0]["content"]
+
+
+def test_passages_appear_with_citation_labels():
+    system = ai.build_chat_messages(SUMMARY, [], "why down?", passages=[passage()])[0]["content"]
+    assert "[AAPL 8-K, 2026-10-01, Item 2]" in system
+    assert "Revenue fell 5%" in system
+    assert system.index(SUMMARY) < system.index("Filing passages")
+
+
+def test_prompt_requires_not_explained_fallback_and_untrusted_passages():
+    system = ai.build_chat_messages(SUMMARY, [], "q", passages=[passage()])[0]["content"]
+    assert "not explained by filings" in system
+    assert "untrusted" in system.lower()
+    empty = ai.build_chat_messages(SUMMARY, [], "q", passages=[])[0]["content"]
+    assert "not explained by filings" in empty
+
+
+def test_passage_text_truncated_per_passage():
+    system = ai.build_chat_messages(SUMMARY, [], "q", passages=[passage(text="Q" * 10_000)])[0]["content"]
+    assert system.count("Q") == ai.MAX_MESSAGE_CHARS
+
+
+def test_chat_reply_passes_passages_through():
+    client = FakeClient(text="ok")
+    ai.chat_reply(SUMMARY, [], "q", "m", client=client, passages=[passage()])
+    assert "[AAPL 8-K, 2026-10-01, Item 2]" in client.calls[0]["messages"][0]["content"]
