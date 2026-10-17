@@ -1,0 +1,26 @@
+{"question": "What were Apple's total net sales in fiscal 2025?", "tickers": ["AAPL"], "evidence": ["| Total net sales | 416,161 | 6 |"], "answerable": true}
+{"question": "How much did iPhone net sales come to in fiscal 2025?", "tickers": ["AAPL"], "evidence": ["| iPhone | 209,586 | 4 |"], "answerable": true}
+{"question": "What were Services net sales in fiscal 2025 and how fast did they grow?", "tickers": ["AAPL"], "evidence": ["| Services (1) | 109,158 | 14 |"], "answerable": true}
+{"question": "What was Apple's net income for fiscal 2025?", "tickers": ["AAPL"], "evidence": ["| Net income | 112,010 | 93,736 | 96,995 |"], "answerable": true}
+{"question": "What were Mac net sales in fiscal 2025?", "tickers": ["AAPL"], "evidence": ["| Mac | 33,708 | 12 |"], "answerable": true}
+{"question": "What were iPad net sales in fiscal 2025?", "tickers": ["AAPL"], "evidence": ["| iPad | 28,023 | 5 |"], "answerable": true}
+{"question": "What fiscal year does Apple's annual report cover?", "tickers": ["AAPL"], "evidence": ["fiscal year ended September 27"], "answerable": true}
+{"question": "What was the market value of Apple stock held by non-affiliates?", "tickers": ["AAPL"], "evidence": ["approximately $ 3,253,431,000,000"], "answerable": true}
+{"question": "What were total net sales in Apple's third quarter of fiscal 2026?", "tickers": ["AAPL"], "evidence": ["| Total net sales | 109,417 | 94,036 | 364,357 | 313,695 |"], "answerable": true}
+{"question": "What was Apple's net income in the third quarter of fiscal 2026?", "tickers": ["AAPL"], "evidence": ["| Net income | 29,789 | 23,434 | 101,464 | 84,544 |"], "answerable": true}
+{"question": "How many shares did Apple buy back in the first nine months of fiscal 2026?", "tickers": ["AAPL"], "evidence": ["repurchased 215 million shares of its common stock for $ 61.8 billion"], "answerable": true}
+{"question": "What did Apple's July 30, 2026 8-K announce?", "tickers": ["AAPL"], "evidence": ["financial results for its third fiscal quarter ended June 27, 2026"], "answerable": true}
+{"question": "Does Apple earn most of its sales outside the United States?", "tickers": ["AAPL"], "evidence": ["sales outside the U.S. representing a majority of the Company’s total net sales"], "answerable": true}
+{"question": "Where is Apple's manufacturing concentrated?", "tickers": ["AAPL"], "evidence": ["outsourcing partners located primarily in China mainland"], "answerable": true}
+{"question": "How has Apple responded to EU competition regulation?", "tickers": ["AAPL"], "evidence": ["the Company has implemented changes to iOS, iPadOS, the App Store and Safari"], "answerable": true}
+{"question": "What risk does Apple describe from its information technology systems?", "tickers": ["AAPL"], "evidence": ["dependent on complex information technology systems"], "answerable": true}
+{"question": "Why is Apple's supply chain a risk?", "tickers": ["AAPL"], "evidence": ["global supply chain is large and complex"], "answerable": true}
+{"question": "How costly is regulatory compliance for Apple?", "tickers": ["AAPL"], "evidence": ["Compliance with these laws and regulations is onerous and expensive"], "answerable": true}
+{"question": "What does Apple say about depending on key personnel?", "tickers": ["AAPL"], "evidence": ["depends on the talents and efforts of its team members"], "answerable": true}
+{"question": "What risk do changes to Apple's supply chain pose?", "tickers": ["AAPL"], "evidence": ["Changes or additions to the Company’s supply chain require considerable time and resources"], "answerable": true}
+{"question": "Why did Apple's stock fall last week?", "tickers": ["AAPL"], "evidence": [], "answerable": false}
+{"question": "What will Apple's iPhone revenue be next year?", "tickers": ["AAPL"], "evidence": [], "answerable": false}
+{"question": "What price target do analysts have for Apple?", "tickers": ["AAPL"], "evidence": [], "answerable": false}
+{"question": "What did Tim Cook say on the latest earnings call?", "tickers": ["AAPL"], "evidence": [], "answerable": false}
+{"question": "How does Apple's market share compare with Samsung's this quarter?", "tickers": ["AAPL"], "evidence": [], "answerable": false}
+{"question": "Is Apple stock a good buy right now?", "tickers": ["AAPL"], "evidence": [], "answerable": false}
