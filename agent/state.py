@@ -1,6 +1,7 @@
 """Shared graph state."""
+import operator
 from dataclasses import dataclass
-from typing import TypedDict
+from typing import Annotated, TypedDict
 
 
 @dataclass(frozen=True)
@@ -22,4 +23,4 @@ class AgentState(TypedDict, total=False):
     rewrites: int
     quotes: dict[str, Quote]
     memo: object  # schemas.Memo
-    trace: list[str]
+    trace: Annotated[list[str], operator.add]  # nodes append; the graph concatenates
