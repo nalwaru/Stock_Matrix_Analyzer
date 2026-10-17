@@ -7,6 +7,7 @@ DENSE_MODEL = "llama-text-embed-v2"
 SPARSE_MODEL = "pinecone-sparse-english-v0"
 RERANK_MODEL = "bge-reranker-v2-m3"
 CLOUD, REGION = "aws", "us-east-1"
+INDEXED_TICKERS = ["AAPL", "MSFT", "NVDA", "AMZN", "GOOGL"]  # holdings with ingested filings
 BATCH = 90
 EMBED_BATCH = 96
 

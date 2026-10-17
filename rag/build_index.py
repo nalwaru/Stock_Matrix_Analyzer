@@ -7,7 +7,7 @@ from pinecone import Pinecone
 
 from rag import chunking, ingest, store
 
-DEFAULT_TICKERS = ["AAPL", "MSFT", "NVDA", "AMZN", "GOOGL"]
+DEFAULT_TICKERS = store.INDEXED_TICKERS
 
 
 def main(tickers: list[str]) -> int:

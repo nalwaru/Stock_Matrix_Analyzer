@@ -1,6 +1,7 @@
 """Stock Portfolio Analyzer: Streamlit entry point (UI wiring only)."""
 import hashlib
 import json
+import os
 from pathlib import Path
 
 import pandas as pd
@@ -9,6 +10,8 @@ import streamlit as st
 from dotenv import load_dotenv
 
 from analyzer import ai, export, market, portfolio, scenarios, schema
+from rag import retrieve as rag_retrieve
+from rag import store as rag_store
 
 load_dotenv()
 
@@ -162,6 +165,39 @@ with tab_stress:
         st.caption("Move the shock sliders in the sidebar to simulate market moves by asset class.")
 
 # ---------- Ask AI ----------
+@st.cache_resource
+def pinecone_client():
+    from pinecone import Pinecone
+
+    return Pinecone(api_key=os.environ["PINECONE_API_KEY"])
+
+
+def filing_passages(question: str, df: pd.DataFrame):
+    """Passages for held tickers with indexed filings, or (None, caption) to answer portfolio-only."""
+    tickers = [t for t in df["Ticker"].unique() if t in rag_store.INDEXED_TICKERS]
+    if not tickers:
+        return None, "No filings are indexed for your current holdings, so this answer uses portfolio data only."
+    if not os.getenv("PINECONE_API_KEY"):
+        return None, "Filing search is off (no PINECONE_API_KEY), so this answer uses portfolio data only."
+    try:
+        namespace = os.getenv("RAG_NAMESPACE", "semantic")
+        return rag_retrieve.retrieve(pinecone_client(), question, tickers, namespace), None
+    except rag_retrieve.RetrievalError as exc:
+        return None, f"{exc} This answer uses portfolio data only."
+
+
+def render_message(msg: dict) -> None:
+    with st.chat_message(msg["role"]):
+        st.markdown(msg["content"])
+        if msg.get("sources"):
+            with st.expander("Sources"):
+                for p in msg["sources"]:
+                    st.markdown(f"**[{p.ticker} {p.form}, {p.filing_date}, {p.section}]** ({p.source_url})")
+                    st.caption(p.text[:600])
+        if msg.get("note"):
+            st.caption(msg["note"])
+
+
 def render_ask_ai(df: pd.DataFrame) -> None:
     st.subheader("Ask AI")
     if not ai.is_configured():
@@ -171,8 +207,9 @@ def render_ask_ai(df: pd.DataFrame) -> None:
         )
         return
     st.caption(
-        "Ask about the current filtered portfolio. Holdings, values and your questions "
-        "are sent to OpenAI. Educational analysis, not financial advice."
+        "Ask about the current filtered portfolio. Holdings, values "
+        "and matching SEC filing passages, plus your questions, are sent to OpenAI. "
+        "Educational analysis, not financial advice."
     )
     st.caption("Try: Which holding lost the most? How concentrated am I in crypto?")
     try:
@@ -210,20 +247,20 @@ def render_ask_ai(df: pd.DataFrame) -> None:
         question = st.chat_input("Ask about your portfolio", max_chars=ai.MAX_QUESTION)
     if question:
         try:
-            with st.spinner("Analyzing portfolio..."):
-                reply = ai.chat_reply(context, chat, question, ai.get_model())
+            with st.spinner("Searching filings and analyzing portfolio..."):
+                passages, note = filing_passages(question, df)
+                reply = ai.chat_reply(context, chat, question, ai.get_model(), passages=passages)
         except ai.AIError as exc:
             st.error(f"{exc} You can retry.")
         else:
             chat += [
                 {"role": "user", "content": question},
-                {"role": "assistant", "content": reply},
+                {"role": "assistant", "content": reply, "sources": passages or [], "note": note},
             ]
             st.session_state["chat"] = chat = chat[-2 * ai.MAX_CHAT_TURNS:]
     for i in range(len(chat) - 2, -1, -2):
         for msg in chat[i:i + 2]:
-            with st.chat_message(msg["role"]):
-                st.markdown(msg["content"])
+            render_message(msg)
 
 
 with tab_ai:
