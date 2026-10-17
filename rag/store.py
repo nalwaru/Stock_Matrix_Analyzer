@@ -1,4 +1,8 @@
 """Pinecone dense and sparse indexes (integrated embedding), namespaced per chunking strategy."""
+import time
+
+from pinecone.errors.exceptions import RateLimitError
+
 from rag.chunking import Chunk
 
 DENSE_INDEX = "filings-dense"
@@ -10,6 +14,19 @@ CLOUD, REGION = "aws", "us-east-1"
 INDEXED_TICKERS = ["AAPL", "NVDA", "AMZN", "RIVN", "GOOGL"]  # holdings with ingested filings
 BATCH = 90
 EMBED_BATCH = 96
+RATE_LIMIT_WAIT = 30  # seconds per attempt; the embedding limit is per minute
+MAX_ATTEMPTS = 8
+
+
+def _retry(call):
+    """Run call(); on a 429 wait for the per-minute window to reset, then retry."""
+    for attempt in range(1, MAX_ATTEMPTS + 1):
+        try:
+            return call()
+        except RateLimitError:
+            if attempt == MAX_ATTEMPTS:
+                raise
+            time.sleep(RATE_LIMIT_WAIT * attempt)
 
 
 def ensure_indexes(pc) -> None:
@@ -31,7 +48,8 @@ def upsert_chunks(pc, namespace: str, chunks: list[Chunk], batch: int = BATCH) -
     for name in (DENSE_INDEX, SPARSE_INDEX):
         index = pc.Index(name)
         for i in range(0, len(records), batch):
-            index.upsert_records(records=records[i:i + batch], namespace=namespace)
+            part = records[i:i + batch]
+            _retry(lambda: index.upsert_records(records=part, namespace=namespace))
     return len(records)
 
 
@@ -47,8 +65,9 @@ def dense_embed(pc, texts: list[str]) -> list[list[float]]:
     """Embed passages with the dense model; used by the semantic chunker."""
     vectors: list[list[float]] = []
     for i in range(0, len(texts), EMBED_BATCH):
-        result = pc.inference.embed(
-            model=DENSE_MODEL, inputs=texts[i:i + EMBED_BATCH], parameters={"input_type": "passage"}
-        )
+        part = texts[i:i + EMBED_BATCH]
+        result = _retry(lambda: pc.inference.embed(
+            model=DENSE_MODEL, inputs=part, parameters={"input_type": "passage"}
+        ))
         vectors.extend(list(item["values"]) for item in result)
     return vectors

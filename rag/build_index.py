@@ -24,6 +24,7 @@ def main(tickers: list[str]) -> int:
             refs = ingest.list_filings(ticker)
             print(f"{ticker}: {len(refs)} filings")
             for ref in refs:
+                print(f"  {ref.form} {ref.filing_date}", flush=True)
                 blocks = ingest.parse_filing(ingest.download(ref).read_text(encoding="utf-8"))
                 meta = {
                     "ticker": ref.ticker, "form": ref.form, "filing_date": ref.filing_date,

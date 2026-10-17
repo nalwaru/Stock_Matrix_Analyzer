@@ -70,3 +70,46 @@ def test_stats_counts_records_per_index_and_namespace():
     pc = FakePinecone()
     store.upsert_chunks(pc, "fixed", chunks(5))
     assert store.stats(pc) == {f"{store.DENSE_INDEX}/fixed": 5, f"{store.SPARSE_INDEX}/fixed": 5}
+
+
+def _rate_limit_error():
+    from pinecone.errors.exceptions import RateLimitError
+
+    try:
+        return RateLimitError("429 tokens per minute")
+    except TypeError:  # constructor signature varies by SDK version
+        err = RateLimitError.__new__(RateLimitError)
+        Exception.__init__(err, "429 tokens per minute")
+        return err
+
+
+def test_upsert_waits_and_retries_on_rate_limit(monkeypatch):
+    waits = []
+    monkeypatch.setattr(store.time, "sleep", waits.append)
+    pc = FakePinecone()
+    real = FakeIndex.upsert_records
+    failures = {"left": 2}
+
+    def flaky(self, *, records, namespace):
+        if failures["left"]:
+            failures["left"] -= 1
+            raise _rate_limit_error()
+        return real(self, records=records, namespace=namespace)
+
+    monkeypatch.setattr(FakeIndex, "upsert_records", flaky)
+    assert store.upsert_chunks(pc, "fixed", chunks(3)) == 3
+    assert len(waits) == 2 and all(w >= 30 for w in waits)
+    assert len(pc.upserts) == 2  # both indexes eventually written
+
+
+def test_rate_limit_gives_up_after_max_attempts(monkeypatch):
+    import pytest
+
+    monkeypatch.setattr(store.time, "sleep", lambda s: None)
+
+    def always(self, *, records, namespace):
+        raise _rate_limit_error()
+
+    monkeypatch.setattr(FakeIndex, "upsert_records", always)
+    with pytest.raises(Exception, match="429"):
+        store.upsert_chunks(FakePinecone(), "fixed", chunks(1))
