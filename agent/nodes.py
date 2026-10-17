@@ -140,3 +140,13 @@ def route_after_grade(state: AgentState) -> str:
     if state.get("graded"):
         return after
     return "rewrite" if state.get("rewrites", 0) < MAX_REWRITES else after
+
+
+def price_node(state: AgentState, deps: Deps) -> dict:
+    tickers = state["route"].tickers or list(state.get("held_tickers", []))
+    quotes = deps.fetch_quotes(tickers)
+    missing = [t for t, q in quotes.items() if q.price is None]
+    line = f"Price tool: {len(quotes) - len(missing)} of {len(quotes)} quotes"
+    if missing:
+        line += f"; unavailable: {', '.join(missing)}"
+    return {"quotes": quotes, "trace": [line]}
