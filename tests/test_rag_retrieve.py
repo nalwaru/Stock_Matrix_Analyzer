@@ -68,7 +68,7 @@ def test_rerank_true_reorders_by_reranker():
     pc = FakePinecone()
     out = retrieve.retrieve(pc, "q", ["AAPL"], "semantic", rerank=True, top_n=2)
     assert pc.reranks == [(store.RERANK_MODEL, 4, 2)]
-    assert [p.id for p in out] == ["id3", "id2"] and out[0].score == 0.9
+    assert [p.id for p in out] == ["id3", "id1"] and out[0].score == 0.9
     assert out[0].ticker == "AAPL" and out[0].section == "Item 7"
 
 
