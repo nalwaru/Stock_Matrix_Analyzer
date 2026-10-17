@@ -113,7 +113,7 @@
 - Test: `tests/test_rag_metrics.py`
 
 **Interfaces:**
-- Produces: `hit_at_k(ranked: list[str], gold: set[str], k: int) -> float`; `mrr(ranked, gold) -> float`; `recall_at_k(ranked, gold, k) -> float`; gold line `{"question", "tickers", "gold_ids": [...], "answerable": bool}`; for `answerable=false` the score is the share of questions where the top reranker score falls below a threshold (document the threshold). `python -m rag.eval.run_eval` prints the 2x2 table.
+- Produces: `hit_at_k(ranked: list[str], gold: set[str], k: int) -> float`; `mrr(ranked, gold) -> float`; `recall_at_k(ranked, gold, k) -> float`; gold line `{"question", "tickers", "evidence": ["exact phrase from the filing", ...], "answerable": bool}`; for `answerable=false` the score is the share of questions where the top reranker score falls below a threshold (document the threshold). `python -m rag.eval.run_eval` prints the 2x2 table.
 
 - [ ] **Step 1: Failing tests:** `test_hit_at_k_basic`, `test_mrr_first_rank_and_miss`, `test_recall_at_k_partial`, `test_empty_gold_does_not_divide_by_zero`.
 - [ ] **Step 2: Run**; expect FAIL.

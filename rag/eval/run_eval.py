@@ -22,6 +22,20 @@ def load_gold(path: Path = GOLD_PATH) -> list[dict]:
     return [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
 
 
+def _norm(text: str) -> str:
+    return " ".join(text.lower().split())
+
+
+def _ranked_keys(passages, evidence: list[str]) -> list[str]:
+    """Strategy-agnostic relevance: a passage is 'e<i>' when it contains evidence phrase i."""
+    keys = []
+    for p in passages:
+        body = _norm(p.text)
+        match = next((f"e{i}" for i, phrase in enumerate(evidence) if _norm(phrase) in body), None)
+        keys.append(match or p.id)
+    return keys
+
+
 def evaluate(pc, gold: list[dict], namespace: str, rerank: bool, k: int = K) -> dict:
     if not gold:
         raise ValueError("The gold set is empty; add questions to rag/eval/gold.jsonl first.")
@@ -29,7 +43,8 @@ def evaluate(pc, gold: list[dict], namespace: str, rerank: bool, k: int = K) -> 
     for item in gold:
         passages = retrieve(pc, item["question"], item["tickers"], namespace, rerank=rerank, top_n=k)
         if item.get("answerable", True):
-            ranked, wanted = [p.id for p in passages], set(item["gold_ids"])
+            ranked = _ranked_keys(passages, item["evidence"])
+            wanted = {f"e{i}" for i in range(len(item["evidence"]))}
             rows.append((metrics.hit_at_k(ranked, wanted, k), metrics.mrr(ranked, wanted),
                          metrics.recall_at_k(ranked, wanted, k)))
         else:
