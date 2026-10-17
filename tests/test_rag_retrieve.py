@@ -80,3 +80,22 @@ def test_empty_tickers_returns_empty_without_calls():
 def test_pinecone_error_becomes_retrieval_error():
     with pytest.raises(retrieve.RetrievalError):
         retrieve.retrieve(FakePinecone(error=RuntimeError("boom")), "q", ["AAPL"], "fixed")
+
+
+def test_retrieve_reads_sdk_style_hit_objects():
+    """The real Pinecone SDK returns objects with .id/.score/.fields, not dicts with _id."""
+    def sdk_hit(i):
+        fields = {"text": f"t{i}", "ticker": "AAPL", "form": "10-K", "filing_date": "2025-10-31",
+                  "section": "Item 7", "source_url": "u"}
+        return NS(id=f"id{i}", score=0.5, fields=fields)
+
+    class SdkIndex:
+        def search(self, *, namespace, query, fields=None):
+            return NS(result=NS(hits=[sdk_hit(0), sdk_hit(1)]))
+
+    class SdkPinecone(FakePinecone):
+        def Index(self, name):
+            return SdkIndex()
+
+    out = retrieve.retrieve(SdkPinecone(), "q", ["AAPL"], "semantic", rerank=False, top_n=2)
+    assert [p.id for p in out] == ["id0", "id1"] and out[0].ticker == "AAPL"

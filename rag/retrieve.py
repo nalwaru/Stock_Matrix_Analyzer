@@ -39,6 +39,11 @@ def _get(obj, key):
     return obj[key] if isinstance(obj, dict) else getattr(obj, key)
 
 
+def _hit_id(hit) -> str:
+    """Dict hits carry _id; the SDK's Hit objects carry id."""
+    return hit["_id"] if isinstance(hit, dict) else hit.id
+
+
 def _hits(pc, index_name: str, namespace: str, query: str, tickers: list[str], top_k: int) -> list:
     response = pc.Index(index_name).search(
         namespace=namespace,
@@ -51,7 +56,7 @@ def _hits(pc, index_name: str, namespace: str, query: str, tickers: list[str], t
 def _passage(hit, score: float) -> Passage:
     fields = _get(hit, "fields")
     return Passage(
-        id=_get(hit, "_id"), score=score,
+        id=_hit_id(hit), score=score,
         **{name: str(_get(fields, name)) for name in FIELDS[:1] + FIELDS[1:]},
     )
 
@@ -66,9 +71,9 @@ def retrieve(
         by_id, rankings = {}, []
         for index_name in (store.DENSE_INDEX, store.SPARSE_INDEX):
             hits = _hits(pc, index_name, namespace, query, tickers, candidates)
-            rankings.append([_get(h, "_id") for h in hits])
+            rankings.append([_hit_id(h) for h in hits])
             for h in hits:
-                by_id.setdefault(_get(h, "_id"), h)
+                by_id.setdefault(_hit_id(h), h)
         merged = rrf(*rankings)[:candidates]
         if not rerank:
             return [_passage(by_id[i], 1.0 / (RRF_K + n + 1)) for n, i in enumerate(merged[:top_n])]

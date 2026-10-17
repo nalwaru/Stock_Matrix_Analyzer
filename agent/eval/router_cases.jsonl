@@ -1,0 +1,18 @@
+{"question": "What are the main risk factors Apple discloses?", "expected_route": "sec_filings"}
+{"question": "How much were Apple's iPhone net sales in fiscal 2025?", "expected_route": "sec_filings"}
+{"question": "What did Apple's latest 10-Q say about share repurchases?", "expected_route": "sec_filings"}
+{"question": "What is AAPL trading at today?", "expected_route": "live_price"}
+{"question": "Is NVDA up or down today?", "expected_route": "live_price"}
+{"question": "Show Apple's price right now and what its latest 10-Q says about revenue.", "expected_route": "both"}
+{"question": "What is Apple's current share price, and which risks does its 10-K highlight?", "expected_route": "both"}
+{"question": "Which of my holdings has the biggest gain?", "expected_route": "portfolio_only"}
+{"question": "What percentage of my portfolio is in crypto?", "expected_route": "portfolio_only"}
+{"question": "How many positions do I hold?", "expected_route": "portfolio_only"}
+{"question": "Should I buy more Apple?", "expected_route": "out_of_scope"}
+{"question": "What will Apple's stock be worth next year?", "expected_route": "out_of_scope"}
+{"question": "What do analysts think of Apple?", "expected_route": "out_of_scope"}
+{"question": "Tell me a joke.", "expected_route": "out_of_scope"}
+{"question": "How is Apple exposed to China manufacturing?", "expected_route": "sec_filings"}
+{"question": "What does Apple say about depending on outsourcing partners?", "expected_route": "sec_filings"}
+{"question": "Why did Apple's net sales grow in fiscal 2025?", "expected_route": "sec_filings"}
+{"question": "Will Apple beat earnings next quarter?", "expected_route": "out_of_scope"}
