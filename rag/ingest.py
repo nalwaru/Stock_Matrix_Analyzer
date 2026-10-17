@@ -1,11 +1,14 @@
 """EDGAR access: pick a ticker's filings, download them, parse them into blocks."""
 import os
+import re
 import time
 from dataclasses import dataclass
 from datetime import date, timedelta
 from pathlib import Path
+from typing import Literal
 
 import requests
+from bs4 import BeautifulSoup
 
 FILINGS_DIR = Path(__file__).parent.parent / "data" / "filings"
 TICKERS_URL = "https://www.sec.gov/files/company_tickers.json"
@@ -103,3 +106,62 @@ def download(ref: FilingRef, session=None) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(html, encoding="utf-8")
     return path
+
+
+@dataclass(frozen=True)
+class Block:
+    kind: Literal["text", "table"]
+    section: str
+    text: str
+
+
+_ITEM = re.compile(r"^\s*item\s+(\d+[a-c]?)\b", re.IGNORECASE)
+_BLOCK_TAGS = ["p", "div", "h1", "h2", "h3", "h4", "h5", "h6", "table"]
+
+
+def _clean(text: str) -> str:
+    return re.sub(r"\s+", " ", text.replace("\xa0", " ")).strip()
+
+
+def _table_markdown(table, section: str) -> str | None:
+    rows = []
+    for tr in table.find_all("tr"):
+        cells = [_clean(c.get_text(" ")) for c in tr.find_all(["th", "td"])]
+        cells = [c for c in cells if c not in ("", "$", ")", "%")]
+        if cells:
+            rows.append(cells)
+    if not rows:
+        return None
+    width = max(len(r) for r in rows)
+    rows = [r + [""] * (width - len(r)) for r in rows]
+    lines = ["| " + " | ".join(r) + " |" for r in rows]
+    lines.insert(1, "| " + " | ".join(["---"] * width) + " |")
+    caption = table.find("caption")
+    title = _clean(caption.get_text(" ")) if caption else "Table"
+    return f"[{section}] {title}\n\n" + "\n".join(lines)
+
+
+def parse_filing(html: str) -> list[Block]:
+    """Split filing HTML into text blocks and whole Markdown tables, tagged by Item section."""
+    soup = BeautifulSoup(html or "", "lxml")
+    blocks: list[Block] = []
+    section = "Document"
+    for el in soup.find_all(_BLOCK_TAGS):
+        if el.find_parent("table") is not None:
+            continue
+        if el.name == "table":
+            markdown = _table_markdown(el, section)
+            if markdown:
+                blocks.append(Block("table", section, markdown))
+            continue
+        if el.find(_BLOCK_TAGS):  # only leaf blocks carry text
+            continue
+        text = _clean(el.get_text(" "))
+        if not text:
+            continue
+        heading = _ITEM.match(text)
+        if heading and len(text) < 200:
+            section = f"Item {heading.group(1).upper()}"
+            continue
+        blocks.append(Block("text", section, text))
+    return blocks
