@@ -8,7 +8,8 @@ from rag.ingest import Block
 
 SIZE = 500  # tokens, counted as whitespace-separated words
 OVERLAP = 50
-THRESHOLD = 0.75
+THRESHOLD = 0.6
+MIN_WORDS = 100  # never split on a similarity drop before this many words
 _SENTENCE = re.compile(r"(?<=[.!?])\s+")
 
 
@@ -73,9 +74,11 @@ def semantic(
     meta: dict,
     embed: Callable[[list[str]], list[list[float]]],
     threshold: float = THRESHOLD,
+    min_words: int = MIN_WORDS,
     max_words: int = 2 * SIZE,
 ) -> list[Chunk]:
-    """Start a new chunk when a sentence is not similar enough to the chunk's running mean."""
+    """Start a new chunk when a sentence is not similar enough to the chunk's running mean
+        (only once the chunk has min_words) or when it would exceed max_words."""
 
     def split(text: str) -> list[str]:
         sentences = [s for s in _SENTENCE.split(text) if s.strip()]
@@ -85,7 +88,8 @@ def semantic(
         chunks, current, centroid, words = [], [sentences[0]], list(vectors[0]), len(sentences[0].split())
         for sentence, vector in zip(sentences[1:], vectors[1:]):
             length = len(sentence.split())
-            if _cosine(centroid, vector) < threshold or words + length > max_words:
+            drop = _cosine(centroid, vector) < threshold and words >= min_words
+            if drop or words + length > max_words:
                 chunks.append(" ".join(current))
                 current, centroid, words = [sentence], list(vector), length
             else:

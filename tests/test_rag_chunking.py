@@ -26,7 +26,7 @@ def test_fixed_chunks_overlap_by_50_tokens():
 
 def test_semantic_splits_where_similarity_drops():
     text = "The cat sat. The cat purred. Stocks fell today. Stocks fell again."
-    chunks = semantic([Block("text", "Item 7", text)], META, fake_embed)
+    chunks = semantic([Block("text", "Item 7", text)], META, fake_embed, min_words=1)
     assert [c.text for c in chunks] == ["The cat sat. The cat purred.", "Stocks fell today. Stocks fell again."]
 
 
@@ -45,3 +45,16 @@ def test_empty_blocks_give_no_chunks():
 def test_text_does_not_merge_across_sections_or_tables():
     blocks = [Block("text", "Item 1", "alpha"), Block("table", "Item 1", "| t |"), Block("text", "Item 2", "beta")]
     assert [c.text for c in fixed_size(blocks, META)] == ["alpha", "| t |", "beta"]
+
+
+def test_semantic_does_not_split_before_min_words():
+    text = "The cat sat. The cat purred. Stocks fell today. Stocks fell again."
+    chunks = semantic([Block("text", "Item 7", text)], META, fake_embed, min_words=10)
+    assert len(chunks) == 1 and chunks[0].text == text
+
+
+def test_semantic_splits_on_drop_once_min_words_reached():
+    cats = " ".join(f"The cat number {i} sat quietly." for i in range(5))  # 30 words
+    text = cats + " Stocks fell today."
+    chunks = semantic([Block("text", "Item 7", text)], META, fake_embed, min_words=20)
+    assert [len(c.text.split()) for c in chunks] == [30, 3]
