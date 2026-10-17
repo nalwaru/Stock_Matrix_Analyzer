@@ -6,6 +6,8 @@ from rag import store
 CANDIDATES = 30
 TOP_N = 5
 RRF_K = 60
+# Reranker scores below this are treated as "not relevant"; starting value, calibrate on eval.
+MIN_RELEVANCE = 0.2
 FIELDS = ["text", "ticker", "form", "filing_date", "section", "source_url"]
 
 

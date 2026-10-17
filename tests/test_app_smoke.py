@@ -131,3 +131,12 @@ def test_pinecone_client_failure_falls_back_to_portfolio_only(monkeypatch):
     assert not at.exception
     assert calls["passages"] is None
     assert any("portfolio data only" in c.value for c in at.caption)
+
+
+def test_low_relevance_passages_are_dropped_before_the_model(monkeypatch):
+    from rag.retrieve import Passage
+
+    weak = Passage("w", "unrelated", "AAPL", "10-K", "2025-11-01", "Item 7", "u", 0.01)
+    at, calls = _ask_ai_app(monkeypatch, lambda *a, **k: [weak])
+    assert not at.exception
+    assert calls["passages"] == []

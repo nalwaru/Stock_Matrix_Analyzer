@@ -7,13 +7,10 @@ from dotenv import load_dotenv
 from pinecone import Pinecone
 
 from rag.eval import metrics
-from rag.retrieve import retrieve
+from rag.retrieve import MIN_RELEVANCE, retrieve
 
 GOLD_PATH = Path(__file__).parent / "gold.jsonl"
 K = 5
-# A reranker score below this on an unanswerable question counts as a correct "can't tell".
-# Starting value; calibrate against the first real run.
-UNANSWERABLE_THRESHOLD = 0.2
 
 
 def load_gold(path: Path = GOLD_PATH) -> list[dict]:
@@ -48,7 +45,7 @@ def evaluate(pc, gold: list[dict], namespace: str, rerank: bool, k: int = K) -> 
             rows.append((metrics.hit_at_k(ranked, wanted, k), metrics.mrr(ranked, wanted),
                          metrics.recall_at_k(ranked, wanted, k)))
         else:
-            rejected.append(not passages or passages[0].score < UNANSWERABLE_THRESHOLD)
+            rejected.append(not passages or passages[0].score < MIN_RELEVANCE)
     n = len(rows) or 1
     return {
         "hit@k": sum(r[0] for r in rows) / n,

@@ -181,7 +181,8 @@ def filing_passages(question: str, df: pd.DataFrame):
         return None, "Filing search is off (no PINECONE_API_KEY), so this answer uses portfolio data only."
     try:
         namespace = os.getenv("RAG_NAMESPACE", "semantic")
-        return rag_retrieve.retrieve(pinecone_client(), question, tickers, namespace), None
+        found = rag_retrieve.retrieve(pinecone_client(), question, tickers, namespace)
+        return [p for p in found if p.score >= rag_retrieve.MIN_RELEVANCE], None
     except rag_retrieve.RetrievalError as exc:
         return None, f"{exc} This answer uses portfolio data only."
     except Exception:  # noqa: BLE001 - e.g. client construction; never break the tab

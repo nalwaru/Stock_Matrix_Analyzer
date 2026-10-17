@@ -170,3 +170,32 @@ def test_chat_reply_passes_passages_through():
     client = FakeClient(text="ok")
     ai.chat_reply(SUMMARY, [], "q", "m", client=client, passages=[passage()])
     assert "[AAPL 8-K, 2026-10-01, Item 2]" in client.calls[0]["messages"][0]["content"]
+
+
+def test_system_prompt_forbids_outside_knowledge_and_gives_polite_refusal():
+    system = ai.build_chat_messages(SUMMARY, [], "q", passages=[passage()])[0]["content"]
+    assert "outside knowledge" in system.lower()
+    assert ai.IDK_MESSAGE in system
+
+
+def test_requests_use_temperature_zero():
+    client = FakeClient(text="ok")
+    ai.chat_reply(SUMMARY, [], "q", "m", client=client)
+    assert client.calls[0]["temperature"] == 0
+
+
+def test_reply_citing_a_source_that_was_not_retrieved_becomes_idk():
+    client = FakeClient(text="Sales fell [AAPL 10-K, 2020-01-01, Item 7].")
+    out = ai.chat_reply(SUMMARY, [], "q", "m", client=client, passages=[passage()])
+    assert out == ai.IDK_MESSAGE
+
+
+def test_reply_citing_a_retrieved_source_is_kept():
+    text = "Revenue fell [AAPL 8-K, 2026-10-01, Item 2]."
+    out = ai.chat_reply(SUMMARY, [], "q", "m", client=FakeClient(text=text), passages=[passage()])
+    assert out == text
+
+
+def test_citation_without_any_passages_becomes_idk():
+    client = FakeClient(text="See [AAPL 10-K, 2025-11-01, Item 7].")
+    assert ai.chat_reply(SUMMARY, [], "q", "m", client=client) == ai.IDK_MESSAGE
