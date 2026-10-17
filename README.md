@@ -33,7 +33,7 @@ uv run pytest
 
 ## Filings-grounded Ask AI (optional)
 
-Ask AI can cite SEC filings (latest 10-K, last 3 10-Qs, last 90 days of 8-Ks) for AAPL, NVDA, AMZN, RIVN and GOOGL.
+Ask AI can cite SEC filings (latest 10-K, last 3 10-Qs, last 90 days of 8-Ks) for AAPL (add more tickers to `INDEXED_TICKERS` in `rag/store.py`, then re-run the loader).
 
 1. Set `SEC_USER_AGENT="Your Name you@example.com"` (EDGAR requires it) and `PINECONE_API_KEY` in `.env`.
 2. Build the indexes once: `uv run python -m rag.build_index` (creates `filings-dense` and `filings-sparse` with namespaces `fixed` and `semantic`; re-running overwrites, it does not duplicate).
