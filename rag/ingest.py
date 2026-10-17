@@ -2,13 +2,14 @@
 import os
 import re
 import time
+import warnings
 from dataclasses import dataclass
 from datetime import date, timedelta
 from pathlib import Path
 from typing import Literal
 
 import requests
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, XMLParsedAsHTMLWarning
 
 FILINGS_DIR = Path(__file__).parent.parent / "data" / "filings"
 TICKERS_URL = "https://www.sec.gov/files/company_tickers.json"
@@ -143,13 +144,20 @@ def _table_markdown(table, section: str) -> str | None:
 
 def parse_filing(html: str) -> list[Block]:
     """Split filing HTML into text blocks and whole Markdown tables, tagged by Item section."""
-    soup = BeautifulSoup(html or "", "lxml")
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", XMLParsedAsHTMLWarning)  # EDGAR serves XHTML
+        soup = BeautifulSoup(html or "", "lxml")
     blocks: list[Block] = []
     section = "Document"
     for el in soup.find_all(_BLOCK_TAGS):
         if el.find_parent("table") is not None:
             continue
         if el.name == "table":
+            flat = _clean(el.get_text(" "))
+            heading = _ITEM.match(flat)
+            if heading and len(flat) < 200:
+                section = f"Item {heading.group(1).upper()}"  # heading laid out as a table
+                continue
             markdown = _table_markdown(el, section)
             if markdown:
                 blocks.append(Block("table", section, markdown))

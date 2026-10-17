@@ -36,3 +36,15 @@ def test_no_headings_or_tables_still_returns_blocks():
 def test_layout_only_table_is_dropped_and_empty_html_is_empty():
     assert parse_filing("<table><tr><td></td></tr></table>") == []
     assert parse_filing("") == []
+
+
+def test_heading_inside_layout_table_sets_section_and_is_not_a_table():
+    html = (
+        "<html><body><table><tr><td>Item&#160;1A.</td><td>Risk Factors</td></tr><tr><td></td><td></td></tr></table>"
+        "<p>Competition may hurt results.</p>"
+        "<table><tr><td>Metric</td><td>2025</td></tr><tr><td>Sales</td><td>$5</td></tr></table></body></html>"
+    )
+    blocks = parse_filing(html)
+    assert [b.kind for b in blocks] == ["text", "table"]
+    assert blocks[0] == Block("text", "Item 1A", "Competition may hurt results.")
+    assert blocks[1].section == "Item 1A"
