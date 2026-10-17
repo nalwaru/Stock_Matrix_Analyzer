@@ -1,4 +1,7 @@
 import json
+
+import numpy as np
+import pandas as pd
 from types import SimpleNamespace as NS
 
 import openai
@@ -53,9 +56,10 @@ def test_chat_reply_returns_text():
 
 
 def test_openai_error_is_wrapped_in_aierror():
-    client = FakeClient(error=openai.OpenAIError("rate limited"))
-    with pytest.raises(ai.AIError, match="rate limited"):
+    client = FakeClient(error=openai.OpenAIError("secret provider detail"))
+    with pytest.raises(ai.AIError, match="could not complete") as exc:
         ai.generate_audit(SUMMARY, "m", client=client)
+    assert "secret" not in str(exc.value)
 
 
 def test_empty_response_raises_aierror():
@@ -79,3 +83,53 @@ def test_model_comes_from_env_with_default(monkeypatch):
 
 def test_audit_is_streamlit_cached():
     assert hasattr(ai.audit, "clear")
+
+
+def holdings(n=3):
+    return pd.DataFrame({
+        "Ticker": [f"T{i}" for i in range(n)],
+        "Asset_Class": ["Stocks"] * n,
+        "Shares": [1.0] * n,
+        "Purchase_Price": [10.0] * n,
+        "Price": [12.0] * n,
+        "Cost_Basis": [10.0] * n,
+        "Current_Value": [12.0 + i for i in range(n)],
+        "Gain_Loss": [2.0] * n,
+        "Gain_Loss_Pct": [20.0] * n,
+        "Day_Change": [np.nan] * n,
+    })
+
+
+def test_build_context_is_sorted_json_with_nulls():
+    ctx = json.loads(ai.build_context(holdings()))
+    assert [h["Ticker"] for h in ctx["holdings"]] == ["T2", "T1", "T0"]
+    assert ctx["holdings"][0]["Day_Change"] is None
+    assert ctx["omitted_holdings"] == 0 and ctx["total_cost"] == 30.0
+
+
+def test_build_context_bounds_rows_and_reports_omitted():
+    ctx = json.loads(ai.build_context(holdings(5), max_rows=2))
+    assert len(ctx["holdings"]) == 2 and ctx["omitted_holdings"] == 3
+
+
+def test_build_context_empty_raises():
+    with pytest.raises(ai.AIError):
+        ai.build_context(holdings(0))
+
+
+def test_chat_reply_rejects_blank_and_oversized_questions():
+    for bad in ("   ", "x" * (ai.MAX_QUESTION + 1)):
+        with pytest.raises(ai.AIError):
+            ai.chat_reply(SUMMARY, [], bad, "m", client=FakeClient())
+
+
+def test_chat_history_messages_are_truncated():
+    history = [{"role": "user", "content": "x" * 10_000}]
+    msgs = ai.build_chat_messages(SUMMARY, history, "q")
+    assert len(msgs[1]["content"]) == ai.MAX_MESSAGE_CHARS
+
+
+def test_request_caps_output_tokens():
+    client = FakeClient()
+    ai.chat_reply(SUMMARY, [], "q", "m", client=client)
+    assert client.calls[0]["max_tokens"] == ai.MAX_OUTPUT_TOKENS

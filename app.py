@@ -1,4 +1,5 @@
 """Stock Portfolio Analyzer: Streamlit entry point (UI wiring only)."""
+import hashlib
 import json
 from pathlib import Path
 
@@ -109,7 +110,7 @@ k2.metric(
 k3.metric("Daily P&L", money(s["day_pnl"]), delta=f"{s['day_pnl_pct']:.2f}%")
 
 tab_dash, tab_stress, tab_ai, tab_export = st.tabs(
-    ["Dashboard", "Stress Test", "AI Insights", "Export"]
+    ["Dashboard", "Stress Test", "Ask AI", "Export"]
 )
 
 # ---------- dashboard ----------
@@ -160,48 +161,73 @@ with tab_stress:
     if not any(shocks.values()):
         st.caption("Move the shock sliders in the sidebar to simulate market moves by asset class.")
 
-# ---------- AI ----------
-with tab_ai:
-    payload = json.dumps(portfolio.ai_summary(enriched), sort_keys=True)
+# ---------- Ask AI ----------
+def render_ask_ai(df: pd.DataFrame) -> None:
+    st.subheader("Ask AI")
     if not ai.is_configured():
         st.info(
-            "AI features are disabled. Set `OPENAI_API_KEY` in your environment or a `.env` "
+            "Ask AI is disabled. Set `OPENAI_API_KEY` in your environment or a `.env` "
             "file (see `.env.example`) and restart the app."
         )
-    else:
-        if st.button("Generate AI Audit"):
-            try:
-                with st.spinner("Analyzing portfolio..."):
-                    st.session_state["audit"] = (payload, ai.audit(payload, ai.get_model()))
-            except ai.AIError as exc:
-                st.error(f"{exc} You can retry.")
-        saved = st.session_state.get("audit")
-        if saved and saved[0] == payload:
-            with st.expander("AI Portfolio Audit", expanded=True):
-                st.markdown(saved[1])
-                st.caption("Educational analysis, not financial advice.")
-        elif saved:
-            st.caption("Your filters changed since the last audit. Generate a new one.")
+        return
+    st.caption(
+        "Ask about the current filtered portfolio. Holdings, values and your questions "
+        "are sent to OpenAI. Educational analysis, not financial advice."
+    )
+    st.caption("Try: Which holding lost the most? How concentrated am I in crypto?")
+    try:
+        context = ai.build_context(df)
+    except ai.AIError as exc:
+        st.info(str(exc))
+        return
 
-        st.subheader("Ask AI about your portfolio")
-        chat = st.session_state.setdefault("chat", [])
-        for msg in chat:
+    fingerprint = hashlib.sha256(context.encode()).hexdigest()
+    if st.session_state.get("ask_ai_scope") != fingerprint:
+        st.session_state["ask_ai_scope"] = fingerprint
+        st.session_state["chat"] = []
+    if st.button("Clear conversation", key="clear_ask_ai"):
+        st.session_state["chat"] = []
+
+    payload = json.dumps(portfolio.ai_summary(df), sort_keys=True)
+    if st.button("Generate AI Audit"):
+        try:
+            with st.spinner("Analyzing portfolio..."):
+                st.session_state["audit"] = (payload, ai.audit(payload, ai.get_model()))
+        except ai.AIError as exc:
+            st.error(f"{exc} You can retry.")
+    saved = st.session_state.get("audit")
+    if saved and saved[0] == payload:
+        with st.expander("AI Portfolio Audit", expanded=True):
+            st.markdown(saved[1])
+            st.caption("Educational analysis, not financial advice.")
+    elif saved:
+        st.caption("Your filters changed since the last audit. Generate a new one.")
+
+    # Input stays at the top; the conversation renders below it, newest exchange first
+    # (each exchange keeps question-then-answer order).
+    chat = st.session_state.setdefault("chat", [])
+    with st.container():
+        question = st.chat_input("Ask about your portfolio", max_chars=ai.MAX_QUESTION)
+    if question:
+        try:
+            with st.spinner("Analyzing portfolio..."):
+                reply = ai.chat_reply(context, chat, question, ai.get_model())
+        except ai.AIError as exc:
+            st.error(f"{exc} You can retry.")
+        else:
+            chat += [
+                {"role": "user", "content": question},
+                {"role": "assistant", "content": reply},
+            ]
+            st.session_state["chat"] = chat = chat[-2 * ai.MAX_CHAT_TURNS:]
+    for i in range(len(chat) - 2, -1, -2):
+        for msg in chat[i:i + 2]:
             with st.chat_message(msg["role"]):
                 st.markdown(msg["content"])
-        if question := st.chat_input("e.g. Which holding is my highest risk?"):
-            with st.chat_message("user"):
-                st.markdown(question)
-            try:
-                reply = ai.chat_reply(payload, chat, question, ai.get_model())
-            except ai.AIError as exc:
-                st.error(f"{exc} You can retry.")
-            else:
-                chat += [
-                    {"role": "user", "content": question},
-                    {"role": "assistant", "content": reply},
-                ]
-                with st.chat_message("assistant"):
-                    st.markdown(reply)
+
+
+with tab_ai:
+    render_ask_ai(enriched)
 
 # ---------- export ----------
 with tab_export:

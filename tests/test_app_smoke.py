@@ -43,3 +43,16 @@ def test_app_falls_back_to_stale_prices_when_quotes_are_empty(monkeypatch):
     assert not at.exception
     assert any("stale" in e.value.lower() for e in at.error)
     assert at.metric[0].label == "Total Portfolio Value"
+
+
+def test_ask_ai_tab_exists_and_is_disabled_without_key(monkeypatch):
+    monkeypatch.setattr(market, "fetch_quotes", fake_quotes)
+    monkeypatch.setattr("dotenv.load_dotenv", lambda *a, **k: False)  # ignore the real .env
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+
+    at = AppTest.from_file(str(ROOT / "app.py"), default_timeout=30)
+    at.run()
+    at.sidebar.toggle[0].set_value(True).run()
+    assert not at.exception
+    assert [t.label for t in at.tabs] == ["Dashboard", "Stress Test", "Ask AI", "Export"]
+    assert any("Ask AI is disabled" in i.value for i in at.info)
