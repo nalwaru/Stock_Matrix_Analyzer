@@ -1,9 +1,10 @@
 """Graph nodes. Each takes (state, deps) and returns a partial state update."""
 from agent.deps import Deps
 from agent.llm import ask_structured
-from agent.schemas import RouteDecision
+from agent.schemas import GradeResult, RewriteResult, RouteDecision
 from agent.state import AgentState
 from analyzer import ai
+from rag.retrieve import RetrievalError
 
 ROUTER_PROMPT = (
     "You route a question about the user's investment portfolio to the right helper. "
@@ -68,3 +69,74 @@ def router_node(state: AgentState, deps: Deps) -> dict:
 
 def route_after_router(state: AgentState) -> str:
     return NEXT_NODE[state["route"].route]
+
+
+MAX_REWRITES = 2
+PASSAGE_CHARS = 1500
+GRADER_PROMPT = (
+    "You grade search results for a question about a company. For each passage decide "
+    "whether it contains information that helps answer the question. Be strict: a passage "
+    "that only shares keywords or is general boilerplate is not relevant. Return one grade "
+    "per passage id with a one-line reason."
+)
+REWRITER_PROMPT = (
+    "The search for the question below found nothing relevant. Rewrite it as a short, "
+    "specific search query for SEC filing text (use the vocabulary filings use, such as "
+    "'net sales', 'risk factors', 'repurchased'). Do not answer the question."
+)
+
+
+def _label(p) -> str:
+    return f"{p.ticker} {p.form}, {p.filing_date}, {p.section}"
+
+
+def retrieve_node(state: AgentState, deps: Deps) -> dict:
+    query = state.get("query") or state["question"]
+    tickers = state["route"].tickers
+    try:
+        passages = deps.retrieve(query, tickers)
+    except RetrievalError as exc:
+        return {"query": query, "passages": [], "trace": [f"Filings search unavailable ({exc})"]}
+    return {
+        "query": query, "passages": passages,
+        "trace": [f"Filings search \"{query}\" -> {len(passages)} passages"],
+    }
+
+
+def grade_node(state: AgentState, deps: Deps) -> dict:
+    passages = state.get("passages", [])
+    if not passages:
+        return {"graded": [], "trace": ["Grader: no passages to grade"]}
+    listing = "\n\n".join(f"id: {p.id}\n[{_label(p)}]\n{p.text[:PASSAGE_CHARS]}" for p in passages)
+    messages = [
+        {"role": "system", "content": GRADER_PROMPT},
+        {"role": "user", "content": f"Question: {state['question']}\n\nPassages:\n{listing}"},
+    ]
+    try:
+        result = ask_structured(messages, GradeResult, deps.model, deps.client)
+    except ai.AIError as exc:
+        return {"graded": [], "trace": [f"Grader failed ({exc}); discarding passages"]}
+    relevant = {g.id for g in result.grades if g.relevant}
+    graded = [p for p in passages if p.id in relevant]
+    return {"graded": graded, "trace": [f"Grader: kept {len(graded)} of {len(passages)} passages"]}
+
+
+def rewrite_node(state: AgentState, deps: Deps) -> dict:
+    rewrites = state.get("rewrites", 0) + 1
+    old = state.get("query") or state["question"]
+    messages = [
+        {"role": "system", "content": REWRITER_PROMPT},
+        {"role": "user", "content": f"Question: {state['question']}\nPrevious query: {old}"},
+    ]
+    try:
+        new = ask_structured(messages, RewriteResult, deps.model, deps.client).query.strip() or old
+    except ai.AIError as exc:
+        return {"rewrites": rewrites, "query": old, "trace": [f"Rewriter failed ({exc}); keeping query"]}
+    return {"rewrites": rewrites, "query": new, "trace": [f"Rewriter ({rewrites}/{MAX_REWRITES}): \"{new}\""]}
+
+
+def route_after_grade(state: AgentState) -> str:
+    after = "price" if state["route"].route == "both" else "synthesize"
+    if state.get("graded"):
+        return after
+    return "rewrite" if state.get("rewrites", 0) < MAX_REWRITES else after
