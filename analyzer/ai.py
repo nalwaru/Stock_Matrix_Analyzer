@@ -134,6 +134,17 @@ def build_context(df: pd.DataFrame, max_rows: int = MAX_HOLDINGS) -> str:
     return json.dumps(context, sort_keys=True, allow_nan=False)
 
 
+def safe_error(exc: OpenAIError) -> AIError:
+    """Map any OpenAI failure to a message that is safe to show (no provider text)."""
+    if isinstance(exc, AuthenticationError):
+        return AIError("The OpenAI API key was rejected. Check OPENAI_API_KEY.")
+    if isinstance(exc, RateLimitError):
+        return AIError("OpenAI quota or rate limit reached. Check billing or retry later.")
+    if isinstance(exc, APIConnectionError):
+        return AIError("Could not reach OpenAI or the request timed out.")
+    return AIError("OpenAI could not complete the request.")
+
+
 def _complete(messages: list[dict], model: str, client=None) -> str:
     if client is None:
         if not is_configured():
@@ -143,14 +154,8 @@ def _complete(messages: list[dict], model: str, client=None) -> str:
         response = client.chat.completions.create(
             model=model, messages=messages, max_tokens=MAX_OUTPUT_TOKENS, temperature=0
         )
-    except AuthenticationError:
-        raise AIError("The OpenAI API key was rejected. Check OPENAI_API_KEY.") from None
-    except RateLimitError:
-        raise AIError("OpenAI quota or rate limit reached. Check billing or retry later.") from None
-    except APIConnectionError:
-        raise AIError("Could not reach OpenAI or the request timed out.") from None
-    except OpenAIError:
-        raise AIError("OpenAI could not complete the request.") from None
+    except OpenAIError as exc:
+        raise safe_error(exc) from None
     text = response.choices[0].message.content
     if not text or not text.strip():
         raise AIError("The model returned an empty response.")

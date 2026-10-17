@@ -1,0 +1,74 @@
+from types import SimpleNamespace as NS
+
+import openai
+import pytest
+from pydantic import BaseModel
+
+from agent import llm
+from agent.schemas import GradeResult, Memo, PassageGrade, RewriteResult, RouteDecision
+from analyzer import ai
+
+
+class Answer(BaseModel):
+    value: int
+
+
+class FakeClient:
+    def __init__(self, parsed=None, refusal=None, error=None):
+        self.calls = []
+        self._parsed, self._refusal, self._error = parsed, refusal, error
+        self.chat = NS(completions=NS(parse=self._parse))
+
+    def _parse(self, **kwargs):
+        self.calls.append(kwargs)
+        if self._error:
+            raise self._error
+        return NS(choices=[NS(message=NS(parsed=self._parsed, refusal=self._refusal))])
+
+
+MESSAGES = [{"role": "user", "content": "hi"}]
+
+
+def test_ask_structured_returns_parsed_model():
+    out = llm.ask_structured(MESSAGES, Answer, "m", client=FakeClient(parsed=Answer(value=3)))
+    assert out == Answer(value=3)
+
+
+def test_ask_structured_passes_schema_and_temperature_zero():
+    client = FakeClient(parsed=Answer(value=1))
+    llm.ask_structured(MESSAGES, Answer, "test-model", client=client)
+    call = client.calls[0]
+    assert call["response_format"] is Answer and call["temperature"] == 0
+    assert call["model"] == "test-model" and call["messages"] == MESSAGES
+
+
+def test_refusal_raises_aierror():
+    with pytest.raises(ai.AIError, match="declined"):
+        llm.ask_structured(MESSAGES, Answer, "m", client=FakeClient(refusal="no"))
+
+
+def test_openai_error_raises_aierror_without_provider_text():
+    client = FakeClient(error=openai.OpenAIError("secret provider detail"))
+    with pytest.raises(ai.AIError) as exc:
+        llm.ask_structured(MESSAGES, Answer, "m", client=client)
+    assert "secret" not in str(exc.value)
+
+
+def test_none_parsed_raises_aierror():
+    with pytest.raises(ai.AIError, match="structured"):
+        llm.ask_structured(MESSAGES, Answer, "m", client=FakeClient(parsed=None))
+
+
+def test_missing_api_key_raises_aierror(monkeypatch):
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    with pytest.raises(ai.AIError, match="OPENAI_API_KEY"):
+        llm.ask_structured(MESSAGES, Answer, "m")
+
+
+def test_schemas_validate_routes_and_fields():
+    assert RouteDecision(route="both", tickers=["AAPL"], reason="r").route == "both"
+    with pytest.raises(Exception):
+        RouteDecision(route="nonsense", tickers=[], reason="r")
+    assert GradeResult(grades=[PassageGrade(id="a", relevant=True, reason="r")]).grades[0].relevant
+    assert RewriteResult(query="q").query == "q"
+    assert Memo(answer="a", key_figures=[], sources=[], unverified=[]).answer == "a"
