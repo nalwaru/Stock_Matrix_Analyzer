@@ -10,8 +10,9 @@ import streamlit as st
 from dotenv import load_dotenv
 
 from analyzer import ai, export, market, portfolio, scenarios, schema
-from rag import retrieve as rag_retrieve
-from rag import store as rag_store
+from agent import graph as agent_graph
+from agent import wiring as agent_wiring
+from agent.memo import idk_memo, render_memo
 
 load_dotenv()
 
@@ -172,23 +173,6 @@ def pinecone_client():
     return Pinecone(api_key=os.environ["PINECONE_API_KEY"])
 
 
-def filing_passages(question: str, df: pd.DataFrame):
-    """Passages for held tickers with indexed filings, or (None, caption) to answer portfolio-only."""
-    tickers = [t for t in df["Ticker"].unique() if t in rag_store.INDEXED_TICKERS]
-    if not tickers:
-        return None, "No filings are indexed for your current holdings, so this answer uses portfolio data only."
-    if not os.getenv("PINECONE_API_KEY"):
-        return None, "Filing search is off (no PINECONE_API_KEY), so this answer uses portfolio data only."
-    try:
-        namespace = os.getenv("RAG_NAMESPACE", "semantic")
-        found = rag_retrieve.retrieve(pinecone_client(), question, tickers, namespace)
-        return [p for p in found if p.score >= rag_retrieve.MIN_RELEVANCE], None
-    except rag_retrieve.RetrievalError as exc:
-        return None, f"{exc} This answer uses portfolio data only."
-    except Exception:  # noqa: BLE001 - e.g. client construction; never break the tab
-        return None, "Filing search is unavailable right now. This answer uses portfolio data only."
-
-
 def render_message(msg: dict) -> None:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
@@ -197,8 +181,10 @@ def render_message(msg: dict) -> None:
                 for p in msg["sources"]:
                     st.markdown(f"**[{p.ticker} {p.form}, {p.filing_date}, {p.section}]** ({p.source_url})")
                     st.caption(p.text[:600])
-        if msg.get("note"):
-            st.caption(msg["note"])
+        if msg.get("trace"):
+            with st.expander("Agent trace"):
+                for line in msg["trace"]:
+                    st.markdown(f"- {line}")
 
 
 def render_ask_ai(df: pd.DataFrame) -> None:
@@ -210,8 +196,8 @@ def render_ask_ai(df: pd.DataFrame) -> None:
         )
         return
     st.caption(
-        "Ask about the current filtered portfolio. Holdings, values "
-        "and matching SEC filing passages, plus your questions, are sent to OpenAI. "
+        "Ask about the current filtered portfolio. Holdings, values, matching SEC filing "
+        "passages and live prices, plus your questions, are sent to OpenAI. "
         "Educational analysis, not financial advice."
     )
     st.caption("Try: Which holding lost the most? How concentrated am I in crypto?")
@@ -249,18 +235,23 @@ def render_ask_ai(df: pd.DataFrame) -> None:
     with st.container():
         question = st.chat_input("Ask about your portfolio", max_chars=ai.MAX_QUESTION)
     if question:
-        try:
-            with st.spinner("Searching filings and analyzing portfolio..."):
-                passages, note = filing_passages(question, df)
-                reply = ai.chat_reply(context, chat, question, ai.get_model(), passages=passages)
-        except ai.AIError as exc:
-            st.error(f"{exc} You can retry.")
-        else:
-            chat += [
-                {"role": "user", "content": question},
-                {"role": "assistant", "content": reply, "sources": passages or [], "note": note},
-            ]
-            st.session_state["chat"] = chat = chat[-2 * ai.MAX_CHAT_TURNS:]
+        with st.spinner("Routing, searching and analyzing..."):
+            try:
+                result = agent_graph.run(
+                    question, list(chat), context, list(df["Ticker"].unique()),
+                    agent_wiring.make_deps(
+                        pinecone_client, os.getenv("RAG_NAMESPACE", "semantic"),
+                        os.getenv("PINECONE_API_KEY", ""),
+                    ),
+                )
+            except Exception:  # noqa: BLE001 - run() never raises; this is a last-resort guard
+                result = {"memo": idk_memo(), "graded": [], "trace": ["Agent failed unexpectedly"]}
+        chat += [
+            {"role": "user", "content": question},
+            {"role": "assistant", "content": render_memo(result["memo"]),
+             "sources": result.get("graded", []), "trace": result.get("trace", [])},
+        ]
+        st.session_state["chat"] = chat = chat[-2 * ai.MAX_CHAT_TURNS:]
     for i in range(len(chat) - 2, -1, -2):
         for msg in chat[i:i + 2]:
             render_message(msg)

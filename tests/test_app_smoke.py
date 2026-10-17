@@ -58,31 +58,19 @@ def test_ask_ai_tab_exists_and_is_disabled_without_key(monkeypatch):
     assert any("Ask AI is disabled" in i.value for i in at.info)
 
 
-def _ask_ai_app(monkeypatch, retrieve_impl, indexed=None):
-    from analyzer import ai
-    from rag import retrieve as rag_retrieve, store
-
+def _ask_ai_app(monkeypatch, run_impl):
     import streamlit as st
+    from agent import graph
 
-    st.cache_resource.clear()  # app caches the Pinecone client across runs
+    st.cache_resource.clear()
     monkeypatch.setattr(market, "fetch_quotes", fake_quotes)
     monkeypatch.setenv("OPENAI_API_KEY", "k")
-    monkeypatch.setenv("PINECONE_API_KEY", "k")
-    calls = {}
-
-    def fake_chat(summary, history, question, model, client=None, passages=None):
-        calls["passages"] = passages
-        return "Because of the 8-K [AAPL 8-K, 2026-10-01, Item 2]."
-
-    monkeypatch.setattr(ai, "chat_reply", fake_chat)
-    monkeypatch.setattr(rag_retrieve, "retrieve", retrieve_impl)
-    if indexed is not None:
-        monkeypatch.setattr(store, "INDEXED_TICKERS", indexed)
+    monkeypatch.setattr(graph, "run", run_impl)
     at = AppTest.from_file(str(ROOT / "app.py"), default_timeout=30)
     at.run()
     at.sidebar.toggle[0].set_value(True).run()
     at.chat_input[0].set_value("Why is AAPL down?").run()
-    return at, calls
+    return at
 
 
 def _passage():
@@ -90,53 +78,44 @@ def _passage():
     return Passage("id1", "Revenue fell on weak demand.", "AAPL", "8-K", "2026-10-01", "Item 2", "http://x", 0.9)
 
 
-def test_answer_shows_sources_expander(monkeypatch):
-    at, calls = _ask_ai_app(monkeypatch, lambda pc, q, tickers, ns, **kw: [_passage()])
+def _state(answer="Because of the 8-K [AAPL 8-K, 2026-10-01, Item 2].", graded=()):
+    from agent.schemas import Memo
+    memo = Memo(answer=answer, key_figures=["Net sales: $5"], sources=["AAPL 8-K, 2026-10-01, Item 2"], unverified=[])
+    return {"memo": memo, "graded": list(graded), "trace": ["Router: sec_filings (r)", "Grader: kept 1 of 3 passages"]}
+
+
+def test_answer_renders_memo_sources_and_agent_trace(monkeypatch):
+    at = _ask_ai_app(monkeypatch, lambda q, h, pj, held, deps: _state(graded=[_passage()]))
     assert not at.exception
-    assert any(e.label == "Sources" for e in at.expander)
-    assert calls["passages"] and calls["passages"][0].id == "id1"
+    labels = [e.label for e in at.expander]
+    assert "Sources" in labels and "Agent trace" in labels
+    assert any("### Answer" in m.value and "Because of the 8-K" in m.value for m in at.markdown)
 
 
-def test_retrieval_error_falls_back_to_portfolio_only(monkeypatch):
-    from rag.retrieve import RetrievalError
+def test_graph_receives_question_history_and_held_tickers(monkeypatch):
+    seen = {}
 
+    def run(question, history, portfolio_json, held, deps):
+        seen.update(question=question, held=held, history=history)
+        return _state()
+
+    at = _ask_ai_app(monkeypatch, run)
+    assert not at.exception
+    assert seen["question"] == "Why is AAPL down?" and "AAPL" in seen["held"] and seen["history"] == []
+
+
+def test_graph_exception_shows_idk_not_crash(monkeypatch):
     def boom(*a, **k):
-        raise RetrievalError("Filing search is unavailable right now.")
+        raise RuntimeError("unexpected")
 
-    at, calls = _ask_ai_app(monkeypatch, boom)
+    at = _ask_ai_app(monkeypatch, boom)
     assert not at.exception
-    assert calls["passages"] is None
-    assert any("unavailable" in c.value for c in at.caption)
+    from analyzer import ai
+    assert any(ai.IDK_MESSAGE in m.value for m in at.markdown)
+
+
+def test_chat_history_resets_when_filters_change(monkeypatch):
+    at = _ask_ai_app(monkeypatch, lambda *a, **k: _state())
     assert any("Because of the 8-K" in m.value for m in at.markdown)
-
-
-def test_portfolio_without_indexed_filings_skips_retrieval(monkeypatch):
-    def must_not_run(*a, **k):
-        raise AssertionError("retrieve should not be called")
-
-    at, calls = _ask_ai_app(monkeypatch, must_not_run, indexed=["ZZZZ"])
-    assert not at.exception
-    assert calls["passages"] is None
-    assert any("filings" in c.value.lower() for c in at.caption)
-
-
-def test_pinecone_client_failure_falls_back_to_portfolio_only(monkeypatch):
-    import pinecone
-
-    def broken(*a, **k):
-        raise ValueError("bad api key format")
-
-    monkeypatch.setattr(pinecone, "Pinecone", broken)
-    at, calls = _ask_ai_app(monkeypatch, lambda *a, **k: [_passage()])
-    assert not at.exception
-    assert calls["passages"] is None
-    assert any("portfolio data only" in c.value for c in at.caption)
-
-
-def test_low_relevance_passages_are_dropped_before_the_model(monkeypatch):
-    from rag.retrieve import Passage
-
-    weak = Passage("w", "unrelated", "AAPL", "10-K", "2025-11-01", "Item 7", "u", 0.01)
-    at, calls = _ask_ai_app(monkeypatch, lambda *a, **k: [weak])
-    assert not at.exception
-    assert calls["passages"] == []
+    at.sidebar.multiselect[0].set_value(["Stocks"]).run()
+    assert not any("Because of the 8-K" in m.value for m in at.markdown)
