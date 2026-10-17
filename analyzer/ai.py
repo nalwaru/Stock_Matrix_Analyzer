@@ -166,13 +166,16 @@ def generate_audit(summary_json: str, model: str, client=None) -> str:
     return _complete(build_audit_messages(summary_json), model, client)
 
 
-def _grounded(reply: str, passages: list | None) -> str:
-    """Replace a reply that cites a filing passage that was never supplied."""
-    allowed = {f"{p.ticker} {p.form}, {p.filing_date}, {p.section}" for p in passages or []}
+def grounded(reply: str, labels: set[str]) -> str:
+    """Replace a reply that cites a source label that was never supplied."""
     for ticker, form, filed, section in CITATION.findall(reply):
-        if f"{ticker} {form}, {filed}, {section}" not in allowed:
+        if f"{ticker} {form}, {filed}, {section}" not in labels:
             return IDK_MESSAGE
     return reply
+
+
+def _grounded(reply: str, passages: list | None) -> str:
+    return grounded(reply, {f"{p.ticker} {p.form}, {p.filing_date}, {p.section}" for p in passages or []})
 
 
 def chat_reply(

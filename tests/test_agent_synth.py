@@ -1,0 +1,84 @@
+import openai
+
+from agent.memo import idk_memo, labels_for, render_memo
+from agent.nodes import refuse_node, synthesize_node
+from agent.schemas import Memo, RouteDecision
+from agent.state import Quote
+from analyzer import ai
+from tests.agent_fakes import ScriptedClient, make_deps, passage
+
+LABEL = "AAPL 10-K, 2025-10-31, Item 1A"
+QUOTE = Quote("AAPL", 250.0, "2026-10-17, 16:45 UTC")
+
+
+def route(name):
+    return RouteDecision(route=name, tickers=["AAPL"], reason="r")
+
+
+def memo(answer, figures=(), sources=(), unverified=()):
+    return Memo(answer=answer, key_figures=list(figures), sources=list(sources), unverified=list(unverified))
+
+
+def state(route_name="sec_filings", graded=(), quotes=None):
+    return {"question": "q", "portfolio_json": "{}", "route": route(route_name),
+            "graded": list(graded), "quotes": quotes or {}, "history": []}
+
+
+def test_grounded_replaces_unsupplied_citation_and_keeps_supplied():
+    assert ai.grounded("x [AAPL 10-K, 2020-01-01, Item 7]", {LABEL}) == ai.IDK_MESSAGE
+    text = f"ok [{LABEL}]"
+    assert ai.grounded(text, {LABEL}) == text
+    assert ai.grounded("no citation", set()) == "no citation"
+
+
+def test_render_memo_has_four_sections_and_idk_is_plain():
+    md = render_memo(memo("Sales rose.", ["Sales: $5"], [LABEL], ["Price unavailable"]))
+    for heading in ("Answer", "Key figures", "Sources", "What I couldn't verify"):
+        assert f"### {heading}" in md
+    assert render_memo(idk_memo()) == ai.IDK_MESSAGE
+
+
+def test_labels_cover_graded_passages_and_priced_quotes_only():
+    s = state(graded=[passage(1)], quotes={"AAPL": QUOTE, "NVDA": Quote("NVDA", None, "t")})
+    assert labels_for(s) == {LABEL, "AAPL live quote, 2026-10-17, 16:45 UTC"}
+
+
+def test_synthesize_without_evidence_returns_idk_without_model_call():
+    client = ScriptedClient()
+    out = synthesize_node(state("sec_filings", graded=[]), make_deps(client))
+    assert out["memo"].answer == ai.IDK_MESSAGE and client.calls == []
+    out = synthesize_node(state("live_price", quotes={"AAPL": Quote("AAPL", None, "t")}), make_deps(client))
+    assert out["memo"].answer == ai.IDK_MESSAGE and client.calls == []
+
+
+def test_synthesize_with_bad_citation_returns_idk():
+    bad = memo("Sales fell [AAPL 10-K, 2019-01-01, Item 7].")
+    client = ScriptedClient(Memo=bad)
+    out = synthesize_node(state(graded=[passage(1)]), make_deps(client))
+    assert out["memo"].answer == ai.IDK_MESSAGE
+
+
+def test_synthesize_keeps_supported_memo_and_adds_missing_price_note():
+    good = memo(f"Risk exists [{LABEL}].", [], [LABEL], [])
+    client = ScriptedClient(Memo=good)
+    quotes = {"AAPL": QUOTE, "NVDA": Quote("NVDA", None, "t")}
+    out = synthesize_node(state("both", graded=[passage(1)], quotes=quotes), make_deps(client))
+    assert out["memo"].answer == good.answer
+    assert any("NVDA" in u for u in out["memo"].unverified)
+
+
+def test_synthesizer_failure_returns_idk():
+    client = ScriptedClient(Memo=openai.OpenAIError("x"))
+    out = synthesize_node(state("portfolio_only"), make_deps(client))
+    assert out["memo"].answer == ai.IDK_MESSAGE
+
+
+def test_portfolio_only_calls_model_and_live_price_citation_is_allowed():
+    text = "Price is $250 [AAPL live quote, 2026-10-17, 16:45 UTC]."
+    client = ScriptedClient(Memo=memo(text))
+    out = synthesize_node(state("live_price", quotes={"AAPL": QUOTE}), make_deps(client))
+    assert out["memo"].answer == text
+
+
+def test_refuse_node_is_idk():
+    assert refuse_node(state("out_of_scope"), make_deps())["memo"].answer == ai.IDK_MESSAGE
