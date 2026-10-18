@@ -28,7 +28,13 @@ def test_labels_follow_citation_shape():
 def test_consensus_and_price_target_upside_are_computed():
     m = run()
     assert "buy" in m["CONSENSUS"] and "2.00" in m["CONSENSUS"] and "40" in m["CONSENSUS"]
-    assert "300.00" in m["PRICE_TARGET"] and "+20.00%" in m["PRICE_TARGET"] and "220.00" in m["PRICE_TARGET"]
+    assert "300.00" in m["PRICE_TARGET"] and "220.00" in m["PRICE_TARGET"]
+    assert "20.00% above the current price 250.00" in m["PRICE_TARGET"]
+
+
+def test_price_target_below_price_says_below():
+    m = run(info={**INFO, "targetMeanPrice": 200.0})
+    assert "20.00% below the current price 250.00" in m["PRICE_TARGET"]
 
 
 def test_lists_are_limited_to_five_entries():

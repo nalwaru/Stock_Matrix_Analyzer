@@ -16,3 +16,8 @@
 {"question": "What does Apple say about depending on outsourcing partners?", "expected_route": "sec_filings"}
 {"question": "Why did Apple's net sales grow in fiscal 2025?", "expected_route": "sec_filings"}
 {"question": "Will Apple beat earnings next quarter?", "expected_route": "out_of_scope"}
+{"question": "Is NVDA overbought right now?", "expected_route": "analysis"}
+{"question": "What is Apple's valuation compared with analyst price targets?", "expected_route": "analysis"}
+{"question": "How volatile is RIVN compared with the market?", "expected_route": "analysis"}
+{"question": "Give me a full analysis of NVDA.", "expected_route": "analysis"}
+{"question": "What happens to my portfolio if crypto falls 30%?", "expected_route": "portfolio_only"}

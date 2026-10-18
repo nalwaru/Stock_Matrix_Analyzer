@@ -1,6 +1,6 @@
 from agent.eval.run_router_eval import CASES_PATH, load_cases, route_accuracy
 
-ROUTES = {"sec_filings", "live_price", "both", "portfolio_only", "out_of_scope"}
+ROUTES = {"sec_filings", "live_price", "both", "portfolio_only", "analysis", "out_of_scope"}
 
 
 def test_route_accuracy_counts_hits_and_lists_misses():

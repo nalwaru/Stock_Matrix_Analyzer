@@ -7,7 +7,8 @@ from rag import retrieve as rag_retrieve
 from rag import store as rag_store
 
 
-def make_deps(get_pinecone: Callable, namespace: str, pinecone_key: str, model: str = "") -> Deps:
+def make_deps(get_pinecone: Callable, namespace: str, pinecone_key: str, model: str = "",
+              holdings=None, analyst_data=None, filings_dir=None) -> Deps:
     def retrieve(query: str, tickers: list[str]) -> list:
         if not pinecone_key:
             raise rag_retrieve.RetrievalError("Filing search is off (no PINECONE_API_KEY).")
@@ -26,4 +27,5 @@ def make_deps(get_pinecone: Callable, namespace: str, pinecone_key: str, model: 
         retrieve=retrieve,
         fetch_quotes=quotes_from_market,
         indexed_tickers=list(rag_store.INDEXED_TICKERS),
+        holdings=holdings, analyst_data=analyst_data, filings_dir=filings_dir,
     )

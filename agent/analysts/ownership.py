@@ -28,10 +28,11 @@ def analyze_ownership(
 
     target, high, low = (_num(info, k) for k in ("targetMeanPrice", "targetHighPrice", "targetLowPrice"))
     price = _num(info, "currentPrice") or _num(info, "regularMarketPrice")
+    gap = target is not None and price and (target / price - 1) * 100
     add("PRICE_TARGET", target is not None and price and
         f"{ticker} analyst price target mean {target:.2f} (low {low if low is None else f'{low:.2f}'}, "
-        f"high {high if high is None else f'{high:.2f}'}) vs current price {price:.2f}: "
-        f"{(target / price - 1) * 100:+.2f}%", "no price targets from Yahoo")
+        f"high {high if high is None else f'{high:.2f}'}); the mean target is {abs(gap):.2f}% "
+        f"{'above' if gap >= 0 else 'below'} the current price {price:.2f}", "no price targets from Yahoo")
 
     add("RATING_CHANGES", upgrades and f"{ticker} latest rating changes: " + " | ".join(
         _line(u, ["date", "firm", "from", "to", "action"]) for u in upgrades[:LIST_LIMIT]), "no rating changes from Yahoo")

@@ -75,3 +75,10 @@ def test_route_after_router_mapping():
                 "portfolio_only": "tools", "analysis": "analysis", "out_of_scope": "refuse"}
     for route, node in expected.items():
         assert route_after_router({"route": decision(route)}) == node
+
+
+def test_analysis_route_keeps_the_analyses_the_router_chose():
+    d = RouteDecision(route="analysis", tickers=["NVDA"], reason="r", analyses=["technical"])
+    out = router_node(state(), deps(FakeClient(d)))
+    assert out["route"].route == "analysis" and out["route"].analyses == ["technical"]
+    assert out["route"].tickers == ["NVDA"]

@@ -20,3 +20,25 @@ Date: 2026-10-17. Data: Apple only (5 filings, `semantic` namespace). Models: `g
 
 ## Not yet verified
 Combined `both` route live; portfolio-only questions live; answer correctness beyond these five; the retrieval comparison (fixed vs semantic, rerank vs not) from `rag/eval` has not been run; the reranker model call worked in this run but its effect is unmeasured.
+
+## Tools and analysts: live run (2026-10-18 UTC, real Yahoo, Pinecone, OpenAI)
+| Question | Outcome |
+|---|---|
+| What percent of my portfolio is in crypto? | Calculator fact `weight_Crypto`: 31.52%, cited. |
+| Compare Apple's total net sales this quarter with last year | `compare_periods` returned 10-Q rows; memo quoted 111,184 vs 95,359 million with citations. An earlier run computed a difference (15,825) itself; the number checker flagged it, and the prompt now forbids computing new numbers. |
+| Is NVDA overbought? | Technical analyst only; RSI(14) 37.56, cited. |
+| AAPL valuation vs analyst targets | Fundamental + ownership; target mean 329.38 is 4.10% below the price 343.46, worded correctly after a fix. |
+| How risky is RIVN? | Risk analyst: volatility 70.36%, beta 2.13, drawdowns, Sharpe 0.17, all cited. |
+| Should I buy NVDA? | Polite refusal without searching. |
+
+Router: 100% on 27 cases (small, author-written).
+
+## Defects the live runs found (all fixed, each with a test)
+1. `router_node` dropped the chosen `analyses`, so every analysis question ran all four analysts.
+2. The synthesizer prompt's example label was copied into a real answer; the grounding check rejected it. Example removed.
+3. Price-target fact used a signed percentage the model misread as the reverse; now worded "above/below".
+4. A duplicated block in `agent/nodes.py` (my edit) overrode the real analysis node; found by tests, removed.
+5. Float noise gave a Sharpe ratio of 158 trillion for a perfectly steady series; near-zero volatility is now "no variation".
+
+## Still unverified
+Analyst numbers were not compared with a charting site (do this for RSI, SMA50/200 and P/E); portfolio calculator was run on the sample portfolio only; the fixed-vs-semantic and rerank evaluation has still not been run; 8-K exhibits (earnings press releases) are not downloaded; yfinance is unofficial and its fields can change.
