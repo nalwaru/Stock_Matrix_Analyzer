@@ -14,9 +14,9 @@ def grades(**flags):
     return GradeResult(grades=[PassageGrade(id=k, relevant=v, reason="r") for k, v in flags.items()])
 
 
-def test_tool_specs_name_the_four_tools():
+def test_tool_specs_name_the_five_tools():
     assert {s["function"]["name"] for s in TOOL_SPECS} == {
-        "search_filings", "portfolio_calc", "run_analysts", "get_price"}
+        "search_filings", "portfolio_calc", "run_analysts", "get_price", "list_filings"}
 
 
 def test_search_filings_returns_graded_passages_with_labels():
@@ -98,3 +98,27 @@ def test_technical_keywords_unlock_the_chart():
     for question in ("Show me the technical chart for NVDA", "What is NVDA's RSI?", "NVDA moving averages?"):
         out = run_tool("run_analysts", {"ticker": "NVDA", "kinds": ["technical"]}, {**STATE, "question": question}, deps)
         assert out["charts"], question
+
+
+def test_list_filings_returns_a_citable_inventory_fact():
+    from rag.inventory import FilingInfo
+    found = [FilingInfo("AAPL", "10-K", "2025-10-31", "https://sec/x")]
+    deps = make_deps(list_filings=lambda t: found)
+    out = run_tool("list_filings", {"ticker": "aapl"}, STATE, deps)
+    assert out["facts"][0].label == "AAPL filings, 2026-10-18, INDEX"
+    assert "latest 10-K: filed 2025-10-31" in out["observation"]
+
+
+def test_list_filings_unindexed_ticker_sets_no_filings():
+    out = run_tool("list_filings", {"ticker": "ORCL"}, STATE, make_deps(list_filings=lambda t: []))
+    assert out["no_filings"] == ["ORCL"] and not out.get("facts")
+
+
+def test_list_filings_without_a_lookup_or_on_failure_is_unavailable():
+    from rag.retrieve import RetrievalError
+
+    def down(ticker):
+        raise RetrievalError("down")
+
+    assert "unavailable" in run_tool("list_filings", {"ticker": "AAPL"}, STATE, make_deps())["observation"].lower()
+    assert "unavailable" in run_tool("list_filings", {"ticker": "AAPL"}, STATE, make_deps(list_filings=down))["observation"].lower()

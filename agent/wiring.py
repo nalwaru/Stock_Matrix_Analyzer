@@ -6,6 +6,7 @@ from openai import OpenAI
 
 from agent.deps import Deps
 from agent.prices import quotes_from_market
+from rag import inventory as rag_inventory
 from rag import retrieve as rag_retrieve
 from rag import store as rag_store
 
@@ -22,6 +23,22 @@ def make_deps(get_pinecone: Callable, namespace: str, pinecone_key: str, model: 
         found = rag_retrieve.retrieve(pc, query, tickers, namespace)
         return [p for p in found if p.score >= rag_retrieve.MIN_RELEVANCE]
 
+    inventory_cache: dict[str, list] = {}
+
+    def list_filings(ticker: str) -> list:
+        ticker = ticker.strip().upper()
+        if ticker in inventory_cache:
+            return inventory_cache[ticker]
+        if not pinecone_key:
+            raise rag_retrieve.RetrievalError("Filing inventory is off (no PINECONE_API_KEY).")
+        try:
+            index = get_pinecone().Index(rag_store.DENSE_INDEX)
+        except Exception as exc:  # noqa: BLE001
+            raise rag_retrieve.RetrievalError("Filing inventory is unavailable right now.") from exc
+        found = rag_inventory.list_filings(index, ticker, namespace)
+        inventory_cache[ticker] = found
+        return found
+
     from analyzer import ai
 
     router_client, router_model = None, ""
@@ -36,6 +53,6 @@ def make_deps(get_pinecone: Callable, namespace: str, pinecone_key: str, model: 
         retrieve=retrieve,
         fetch_quotes=quotes_from_market,
         indexed_tickers=list(rag_store.INDEXED_TICKERS),
-        holdings=holdings, analyst_data=analyst_data,
+        holdings=holdings, analyst_data=analyst_data, list_filings=list_filings,
         router_client=router_client, router_model=router_model, on_step=on_step,
     )

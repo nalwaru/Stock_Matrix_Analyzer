@@ -21,6 +21,24 @@ def quote_label(q) -> str:
     return f"{q.ticker} live quote, {q.as_of}"
 
 
+def filings_fact(ticker: str, filings: list, today: str):
+    """One citable fact listing the filings in the index, newest first."""
+    from agent.state import Fact
+
+    latest: dict[str, object] = {}
+    for f in filings:  # newest first, so the first of each form is its latest
+        latest.setdefault(f.form, f)
+    lines = [f"latest {form}: filed {f.filing_date} ({f.url})" for form, f in latest.items()]
+    rest = [f"{f.form} filed {f.filing_date} ({f.url})" for f in filings if latest[f.form] is not f]
+    text = f"SEC filings available for {ticker}: " + "; ".join(lines + rest)
+    return Fact(f"{ticker} filings, {today}, INDEX", text)
+
+
+def visible_sources(state) -> list:
+    """Passages to show under an answer; none when the answer is 'I don't know'."""
+    return [] if state["memo"].answer == ai.IDK_MESSAGE else list(state.get("graded", []))
+
+
 def labels_for(state) -> set[str]:
     labels = {passage_label(p) for p in state.get("graded", [])}
     if state.get("today"):

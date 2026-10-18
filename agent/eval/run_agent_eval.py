@@ -13,7 +13,7 @@ from analyzer import ai
 
 CASES_PATH = Path(__file__).parent / "agent_cases.jsonl"
 SAMPLE = Path(__file__).parents[2] / "data" / "sample_portfolio.csv"
-KNOWN_TOOLS = {"search_filings", "portfolio_calc", "run_analysts", "get_price"}
+KNOWN_TOOLS = {"search_filings", "portfolio_calc", "run_analysts", "get_price", "list_filings"}
 KNOWN_SECTIONS = {"outlook", "declined", "idk"}
 _TOOL_LINE = re.compile(r"^Agent tool: (\w+)\(")
 

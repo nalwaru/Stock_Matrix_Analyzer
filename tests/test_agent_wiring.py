@@ -55,3 +55,21 @@ def test_disclosure_names_openrouter_only_when_configured(monkeypatch):
     assert "OpenRouter" in disclosure()
     monkeypatch.delenv("OPENROUTER_API_KEY")
     assert "OpenRouter" not in disclosure()
+
+
+def test_make_deps_list_filings_off_without_a_pinecone_key():
+    import pytest
+    from rag.retrieve import RetrievalError
+    deps = make_deps(lambda: object(), "semantic", pinecone_key="")
+    with pytest.raises(RetrievalError):
+        deps.list_filings("AAPL")
+
+
+def test_make_deps_list_filings_is_cached_per_ticker(monkeypatch):
+    from rag import inventory
+    calls = []
+    monkeypatch.setattr(inventory, "list_filings", lambda index, ticker, ns: calls.append(ticker) or [])
+    pc = type("PC", (), {"Index": lambda self, name: object()})()
+    deps = make_deps(lambda: pc, "semantic", pinecone_key="k")
+    deps.list_filings("AAPL"); deps.list_filings("AAPL"); deps.list_filings("MSFT")
+    assert calls == ["AAPL", "MSFT"]

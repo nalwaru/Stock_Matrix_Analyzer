@@ -13,6 +13,7 @@ class Deps:
     fetch_quotes: Callable[[list[str]], dict[str, Quote]]
     indexed_tickers: list[str]
     holdings: object = None  # enriched holdings DataFrame for the portfolio calculator
+    list_filings: Callable[[str], list] | None = None  # ticker -> FilingInfo list (Pinecone inventory)
     analyst_data: object = None  # YahooData-like adapter for the analysts
     router_client: object = None  # separate client (e.g. OpenRouter) for the router only
     on_step: Callable[[str], None] | None = None  # live progress lines for the UI

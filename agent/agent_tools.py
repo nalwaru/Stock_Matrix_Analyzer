@@ -6,13 +6,14 @@ from typing import Literal
 from pydantic import BaseModel, ValidationError
 
 from agent.deps import Deps
-from agent.memo import passage_label, quote_label
+from agent.memo import filings_fact, passage_label, quote_label
 from agent.nodes import (MAX_REWRITES, analysis_node, grade_node, price_node, retrieve_node,
                          rewrite_node)
 from agent.schemas import CalcCall, RouteDecision
 from agent.state import AgentState
 from agent.tools.portfolio import run_calc
 from analyzer import ai
+from rag.retrieve import RetrievalError
 
 MAX_FILING_REWRITES = 1
 
@@ -30,6 +31,10 @@ class SearchFilingsArgs(BaseModel):
 class RunAnalystsArgs(BaseModel):
     ticker: str
     kinds: list[Literal["technical", "fundamental", "risk", "ownership"]]
+
+
+class ListFilingsArgs(BaseModel):
+    ticker: str
 
 
 class GetPriceArgs(BaseModel):
@@ -51,6 +56,9 @@ TOOL_SPECS = [
           "ticker. Use for valuation, margins, growth, volatility, trend, analyst targets and "
           "outlook questions.", RunAnalystsArgs),
     _spec("get_price", "Get live prices for tickers.", GetPriceArgs),
+    _spec("list_filings", "List which SEC filings are available for a ticker (form, filing date, "
+          "link) and which is the latest. Use for questions such as 'latest 10-K', 'when was the "
+          "last 10-Q' or 'which filings do you have'.", ListFilingsArgs),
 ]
 
 
@@ -128,11 +136,32 @@ def _get_price(args: GetPriceArgs, state: AgentState, deps: Deps) -> dict:
             "observation": observation or "No prices were available."}
 
 
+def _list_filings(args: ListFilingsArgs, state: AgentState, deps: Deps) -> dict:
+    ticker = args.ticker.strip().upper()
+    if ticker not in deps.indexed_tickers:
+        return {"no_filings": [ticker], "trace": [f"list_filings: no filings are available for {ticker}"],
+                "observation": f"No filings are available for {ticker}."}
+    unavailable = {"observation": "The filing list is unavailable right now.",
+                   "trace": ["list_filings: inventory unavailable"]}
+    if deps.list_filings is None:
+        return unavailable
+    try:
+        found = deps.list_filings(ticker)
+    except RetrievalError:
+        return unavailable
+    if not found:
+        return {"no_filings": [ticker], "trace": [f"list_filings: no filings found for {ticker}"],
+                "observation": f"No filings are available for {ticker}."}
+    fact = filings_fact(ticker, found, state.get("today", ""))
+    return {"facts": [fact], "trace": [], "observation": f"[{fact.label}] {fact.text}"}
+
+
 _TOOLS = {
     "search_filings": (SearchFilingsArgs, _search_filings),
     "portfolio_calc": (CalcCall, _portfolio_calc),
     "run_analysts": (RunAnalystsArgs, _run_analysts),
     "get_price": (GetPriceArgs, _get_price),
+    "list_filings": (ListFilingsArgs, _list_filings),
 }
 
 

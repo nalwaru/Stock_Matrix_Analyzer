@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 from analyzer import ai, export, loading, market, portfolio, scenarios, schema
 from agent import graph as agent_graph
 from agent import wiring as agent_wiring
-from agent.memo import idk_memo, markdown_safe, render_memo
+from agent.memo import idk_memo, markdown_safe, render_memo, visible_sources
 
 load_dotenv()
 
@@ -281,7 +281,7 @@ def render_ask_ai(df: pd.DataFrame) -> None:
         chat += [
             {"role": "user", "content": question},
             {"role": "assistant", "content": render_memo(result["memo"]),
-             "sources": result.get("graded", []), "trace": result.get("trace", []),
+             "sources": visible_sources(result), "trace": result.get("trace", []),
              "charts": [] if result["memo"].answer == ai.IDK_MESSAGE else result.get("charts", [])},
         ]
         st.session_state["chat"] = chat = chat[-2 * ai.MAX_CHAT_TURNS:]

@@ -161,3 +161,11 @@ def test_render_memo_hides_what_i_couldnt_verify_when_empty():
     assert "What I couldn't verify" not in md and "None" not in md
     noted = Memo(answer="a", key_figures=[], sources=[], unverified=["Price unavailable"])
     assert "### What I couldn't verify\n- Price unavailable" in render_memo(noted)
+
+
+def test_sources_are_hidden_when_the_answer_is_idk():
+    from agent.memo import visible_sources
+    passages = [passage(1)]
+    assert visible_sources({"memo": idk_memo(), "graded": passages}) == []
+    assert visible_sources({"memo": memo(), "graded": passages}) == passages
+    assert visible_sources({"memo": memo()}) == []

@@ -5,3 +5,5 @@
 {"question": "Will AAPL hit 300 by December?", "expect_tools": [], "expect_sections": ["idk"], "forbid": []}
 {"question": "oracle outlook?", "expect_tools": ["run_analysts"], "expect_sections": ["outlook"], "forbid": ["no sec filings", "no relevant sec filing"], "expect_no_chart": true}
 {"question": "tala outlook", "expect_tools": [], "expect_sections": ["idk"], "forbid": [], "expect_no_chart": true}
+{"question": "latest 10-K from apple", "expect_tools": ["list_filings"], "expect_sections": [], "forbid": ["don't know"], "expect_no_chart": true}
+{"question": "when was Apple's last 10-Q filed?", "expect_tools": ["list_filings"], "expect_sections": [], "forbid": ["don't know"], "expect_no_chart": true}
