@@ -12,6 +12,7 @@ from dotenv import load_dotenv
 from analyzer import ai, export, loading, market, portfolio, scenarios, schema
 from agent import graph as agent_graph
 from agent import wiring as agent_wiring
+from analyzer.avatars import ASSISTANT_AVATAR, AVATARS, USER_AVATAR
 from agent.memo import idk_memo, markdown_safe, render_memo, visible_sources
 
 load_dotenv()
@@ -181,11 +182,6 @@ def yahoo_data():
     from agent.analysts.data import YahooData
 
     return YahooData()
-
-
-USER_AVATAR = "\U0001F4BC"  # briefcase
-ASSISTANT_AVATAR = "\U0001F4C8"  # chart increasing
-AVATARS = {"user": USER_AVATAR, "assistant": ASSISTANT_AVATAR}
 
 
 def render_message(msg: dict) -> None:
