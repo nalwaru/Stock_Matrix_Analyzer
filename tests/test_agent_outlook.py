@@ -133,3 +133,8 @@ def test_memo_with_evidence_lists_tickers_without_filings():
 def test_agent_stopped_early_is_flagged():
     out = run(memo(), outlook=False, agent_stopped_early=True)
     assert any("stopped early" in u for u in out.unverified)
+
+
+def test_outlook_section_carries_a_not_a_financial_advisor_line():
+    md = render_memo(memo(outlook=[f"P/E is 30.0 [{PE}]"], leaning="neutral"))
+    assert "not a financial advisor" in md.lower()

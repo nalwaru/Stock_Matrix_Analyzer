@@ -103,7 +103,12 @@ def test_wants_outlook_forces_analysts_when_agent_skips_them():
     client, deps = deps_with([assistant("done")])
     out = agent_node(state(outlook=True), deps)
     assert {f.label.split(", ")[0].split(" ")[0] for f in out["facts"]} == {"AAPL"}
-    assert any("technical" in f.label for f in out["facts"])
+    kinds = {f.label.split(", ")[0].split(" ")[1] for f in out["facts"]}
+    assert "fundamental" in kinds and "technical" not in kinds and not out["charts"]
+
+
+def test_agent_prompt_keeps_technical_analysis_for_explicit_requests():
+    assert "technical" in AGENT_PROMPT.lower() and "only when" in AGENT_PROMPT.lower()
 
 
 def test_injection_in_passage_is_passed_as_tool_data_only():

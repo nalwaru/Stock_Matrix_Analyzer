@@ -33,6 +33,7 @@ def labels_for(state) -> set[str]:
 _BRACKET = re.compile(r"\[([^\[\]]+)\]")
 _ENDS_WITH_BRACKET = re.compile(r"\]\W*$")
 _ANALYST_LABEL = re.compile(r"^\S+ (technical|fundamental|risk|ownership), ")
+ADVISOR_NOTE = "_I'm not a financial advisor. This is an educational estimate from the data above, not advice._"
 OUTLOOK_TITLE = "Outlook (Estimate based on the data above, not a filing fact and not financial advice)"
 
 
@@ -71,7 +72,7 @@ def render_memo(memo: Memo) -> str:
     if memo.outlook or memo.outlook_leaning:
         leaning = f"Leaning: {memo.outlook_leaning}\n" if memo.outlook_leaning else ""
         body = "\n".join(f"- {r}" for r in memo.outlook)
-        parts.insert(3, f"### {OUTLOOK_TITLE}\n{leaning}{body}")
+        parts.insert(3, f"### {OUTLOOK_TITLE}\n{leaning}{body}\n\n{ADVISOR_NOTE}")
     if no_filings:
         parts.append(no_filings)
     if declined:
