@@ -81,6 +81,7 @@ def retrieve(
         result = pc.inference.rerank(
             model=store.RERANK_MODEL, query=query, documents=docs,
             rank_fields=["text"], top_n=top_n, return_documents=False,
+            parameters={"truncate": "END"},  # a chunk over the model's 1024-token limit must not fail the search
         )
         return [_passage(by_id[merged[_get(r, "index")]], float(_get(r, "score"))) for r in _get(result, "data")]
     except Exception as exc:  # noqa: BLE001 - any Pinecone/network failure degrades gracefully

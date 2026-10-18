@@ -27,8 +27,9 @@ class FakeInference:
     def __init__(self, pc):
         self.pc = pc
 
-    def rerank(self, *, model, query, documents, rank_fields, top_n, return_documents):
+    def rerank(self, *, model, query, documents, rank_fields, top_n, return_documents, parameters=None):
         self.pc.reranks.append((model, len(documents), top_n))
+        self.pc.rerank_parameters = parameters
         order = list(range(len(documents)))[::-1][:top_n]  # reverse = visibly reordered
         return NS(data=[NS(index=i, score=0.9 - 0.1 * n) for n, i in enumerate(order)])
 
@@ -99,3 +100,9 @@ def test_retrieve_reads_sdk_style_hit_objects():
 
     out = retrieve.retrieve(SdkPinecone(), "q", ["AAPL"], "semantic", rerank=False, top_n=2)
     assert [p.id for p in out] == ["id0", "id1"] and out[0].ticker == "AAPL"
+
+
+def test_rerank_truncates_oversized_passages_instead_of_failing():
+    pc = FakePinecone()
+    retrieve.retrieve(pc, "q", ["AAPL"], "semantic", rerank=True, top_n=2)
+    assert pc.rerank_parameters == {"truncate": "END"}
