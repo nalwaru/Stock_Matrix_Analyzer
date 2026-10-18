@@ -100,3 +100,16 @@ def test_no_resolved_tickers_line_when_the_route_has_none():
     s = {"question": "q", "portfolio_json": "{}", "graded": [], "quotes": {}, "facts": [],
          "route": RouteDecision(route="portfolio_only", tickers=[], reason="r")}
     assert "resolved" not in _evidence_block(s).lower()
+
+
+def test_refuse_node_states_the_declined_part():
+    from agent.memo import render_memo
+    declined = RouteDecision(route="out_of_scope", tickers=["AAPL"], reason="r", declined_part="recent news")
+    out = refuse_node({**state("out_of_scope"), "route": declined}, make_deps())["memo"]
+    assert out.answer == ai.IDK_MESSAGE and out.declined == "recent news"
+    assert "Not answered: recent news" in render_memo(out)
+
+
+def test_router_prompt_declines_news_requests_with_a_clear_reason():
+    from agent.nodes import ROUTER_PROMPT
+    assert "news" in ROUTER_PROMPT.lower() and "no news source" in ROUTER_PROMPT.lower()

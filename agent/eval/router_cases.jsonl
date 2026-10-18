@@ -37,3 +37,7 @@
 {"question": "What is the outlook for Zorblax Corp?", "expected_route": "out_of_scope"}
 {"question": "oracle outlook?", "expected_route": "agent", "expected_tickers": ["ORCL"], "expected_wants_outlook": true}
 {"question": "rivianll price", "expected_route": "live_price", "expected_tickers": ["RIVN"]}
+{"question": "latest news on apple", "expected_route": "out_of_scope", "expected_declined": true}
+{"question": "latest update on apple", "expected_route": "out_of_scope", "expected_declined": true}
+{"question": "What were Apple's latest quarterly results?", "expected_route": "agent", "expected_tickers": ["AAPL"]}
+{"question": "Apple news and its P/E ratio", "expected_route": "agent", "expected_tickers": ["AAPL"], "expected_declined": true}

@@ -33,6 +33,12 @@ ROUTER_PROMPT = (
     "300?', 'will X beat earnings next quarter?'), other people's opinions or market sentiment, topics unrelated to investing, or a question about a specific company you cannot map to a real public ticker (a private, fictional or unknown company; never substitute a held ticker for it). "
     "Questions about what a company discloses or what drove its results are agent, never "
     "out_of_scope.\n"
+    "This app has no news feed: only SEC filings, analyst data and prices. A request for news, "
+    "headlines or 'the latest update/news on X' is therefore not answerable: if nothing else in "
+    "the question is in scope, choose out_of_scope; if part of it is, choose that route. Either "
+    "way set declined_part to exactly: recent news (no news source here; only SEC filings, "
+    "analyst data and prices). A question about the latest results, filings or earnings is "
+    "answerable and is not a news request.\n"
     "Set wants_outlook true whenever ANY part of the question asks about a company's future "
     "business or growth (for example 'do you expect growth next year?', 'what is the outlook "
     "for Apple?'), even if another part asks for a past fact such as profit; otherwise false.\n"
@@ -394,4 +400,4 @@ def synthesize_node(state: AgentState, deps: Deps) -> dict:
 
 
 def refuse_node(state: AgentState, deps: Deps) -> dict:
-    return {"memo": idk_memo(), "trace": ["Out of scope: replied \"I don't know\" without searching"]}
+    return {"memo": _idk(state), "trace": ["Out of scope: replied \"I don't know\" without searching"]}
