@@ -147,3 +147,18 @@ def test_gate_falls_back_to_the_openai_model_when_the_router_model_keeps_failing
 def test_gate_without_a_router_model_has_no_fallback_note():
     out = router_node(state(), deps(FakeClient(decision("agent", ["AAPL"]))))
     assert "fallback" not in out["trace"][0].lower()
+
+
+def test_long_reasons_are_capped_in_the_trace_at_a_word_boundary():
+    from agent.nodes import REASON_CHARS
+    long_reason = "Asks about Rivian's filings, which is a company SEC filing question; not a news request, not out of scope. " * 3
+    out = router_node(state(), deps(FakeClient(decision("agent", ["AAPL"], reason=long_reason))))
+    line = out["trace"][0]
+    inside = line[line.index("(") + 1: line.rindex(")")]
+    assert len(inside) <= REASON_CHARS + 1 and inside.endswith("…")
+    assert not inside[:-1].endswith(" ") and long_reason.startswith(inside[:-1])
+
+
+def test_short_reasons_are_left_alone():
+    out = router_node(state(), deps(FakeClient(decision("agent", ["AAPL"], reason="Filings question."))))
+    assert out["trace"][0].startswith("Router: agent (Filings question.)")

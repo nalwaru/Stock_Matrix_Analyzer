@@ -62,6 +62,14 @@ NEXT_NODE = {
 }
 MAX_HELD_DEFAULT = 3
 GATE_ATTEMPTS = 2
+REASON_CHARS = 90  # the gate's free-text reason is only a trace note, so keep it short
+
+
+def _short(text: str, limit: int = REASON_CHARS) -> str:
+    text = " ".join(text.split())
+    if len(text) <= limit:
+        return text
+    return text[:limit].rsplit(" ", 1)[0].rstrip(" ,;:.") + "…"
 
 
 def _gate_call(messages: list[dict], model: str, client, extra_body=None) -> RouteDecision:
@@ -112,7 +120,7 @@ def router_node(state: AgentState, deps: Deps) -> dict:
             tickers = held
         elif route == "agent":
             tickers = held[:MAX_HELD_DEFAULT]
-    line = f"Router: {route} ({decision.reason})"
+    line = f"Router: {route} ({_short(decision.reason)})"
     if note:
         line += f"; {note}"
     if decision.about_filings:
