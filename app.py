@@ -122,17 +122,20 @@ tab_dash, tab_stress, tab_ai, tab_export = st.tabs(
 with tab_dash:
     left, right = st.columns(2)
     alloc = portfolio.allocation(enriched)
+    colors = portfolio.class_colors(holdings)  # from all holdings, so colours survive filtering
     top = portfolio.top_holdings(enriched, 10)
     if alloc.empty:
         st.info("No priced holdings to chart.")
     else:
         left.plotly_chart(
             px.pie(alloc, names="Asset_Class", values="Current_Value", hole=0.5,
-                   title="Allocation by Asset Class"),
+                   title="Allocation by Asset Class", color="Asset_Class",
+                   color_discrete_map=colors),
             width="stretch",
         )
         right.plotly_chart(
-            px.bar(top, x="Ticker", y="Current_Value", title="Top Holdings by Current Value"),
+            px.bar(top, x="Ticker", y="Current_Value", title="Top Holdings by Current Value",
+                   color="Asset_Class", color_discrete_map=colors),
             width="stretch",
         )
     st.dataframe(

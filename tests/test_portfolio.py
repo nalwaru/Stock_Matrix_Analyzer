@@ -107,3 +107,19 @@ def test_ai_summary_shape_and_rounding():
     assert a["allocation_pct"] == {"Stocks": 60.0, "ETFs": 40.0}
     assert a["top_positions"][0] == {"ticker": "AAPL", "value": 1500.0, "weight_pct": 60.0}
     assert a["total_roi_pct"] == pytest.approx((2500 - 1800) / 1800 * 100, abs=0.01)
+
+
+def test_top_holdings_carries_each_tickers_asset_class():
+    h = holdings([("AAPL", 10, 100.0, "Stocks"), ("VOO", 2, 400.0, "ETFs"), ("BTC-USD", 1, 100.0, "Crypto")])
+    df = portfolio.enrich(h, quotes({"AAPL": [100.0, 100.0, 1.0, 1.0], "VOO": [500.0, 500.0, 1.0, 1.0],
+                                     "BTC-USD": [900.0, 900.0, 1.0, 1.0]}))
+    top = portfolio.top_holdings(df, 3).set_index("Ticker")["Asset_Class"].to_dict()
+    assert top == {"AAPL": "Stocks", "VOO": "ETFs", "BTC-USD": "Crypto"}
+
+
+def test_class_colors_are_distinct_and_stable_whatever_the_row_order():
+    a = holdings([("AAPL", 1, 1.0, "Stocks"), ("VOO", 1, 1.0, "ETFs"), ("O", 1, 1.0, "REITs")])
+    b = a.iloc[::-1]
+    colors = portfolio.class_colors(a)
+    assert colors == portfolio.class_colors(b)
+    assert set(colors) == {"Stocks", "ETFs", "REITs"} and len(set(colors.values())) == 3

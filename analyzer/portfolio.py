@@ -70,11 +70,20 @@ def allocation(df: pd.DataFrame) -> pd.DataFrame:
 def top_holdings(df: pd.DataFrame, n: int = 10) -> pd.DataFrame:
     return (
         df.dropna(subset=["Current_Value"])
-        .groupby("Ticker", as_index=False)["Current_Value"]
-        .sum()
+        .groupby("Ticker", as_index=False)
+        .agg(Current_Value=("Current_Value", "sum"), Asset_Class=("Asset_Class", "first"))
         .nlargest(n, "Current_Value")
         .reset_index(drop=True)
     )
+
+
+PALETTE = ["#636EFA", "#EF553B", "#00CC96", "#AB63FA", "#FFA15A", "#19D3F3", "#FF6692", "#B6E880"]
+
+
+def class_colors(df: pd.DataFrame) -> dict[str, str]:
+    """One stable colour per asset class (sorted order), shared by every chart."""
+    classes = sorted(df["Asset_Class"].unique())
+    return {cls: PALETTE[i % len(PALETTE)] for i, cls in enumerate(classes)}
 
 
 def ai_summary(df: pd.DataFrame) -> dict:
