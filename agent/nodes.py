@@ -7,6 +7,7 @@ from agent.memo import check_numbers, idk_memo, labels_for, passage_label, quote
 from agent.schemas import GradeResult, Memo, RewriteResult, RouteDecision, ToolPlan
 from agent.state import AgentState
 from agent.tools import filings as filing_tools
+from agent.tools.history import price_changes
 from agent.tools.portfolio import run_calc
 from analyzer import ai
 from rag.retrieve import RetrievalError
@@ -237,7 +238,12 @@ def price_node(state: AgentState, deps: Deps) -> dict:
     line = f"Price tool: {len(quotes) - len(missing)} of {len(quotes)} quotes"
     if missing:
         line += f"; unavailable: {', '.join(missing)}"
-    return {"quotes": quotes, "trace": [line]}
+    update = {"quotes": quotes, "trace": [line]}
+    if deps.analyst_data is not None:
+        history = price_changes(list(quotes), fetch=deps.analyst_data.closes)
+        update["facts"] = history
+        update["trace"].append(f"Price history: {len(history)} facts")
+    return update
 
 
 SYNTH_PROMPT = (
