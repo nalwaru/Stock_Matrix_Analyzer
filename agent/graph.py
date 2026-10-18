@@ -5,8 +5,9 @@ from langgraph.graph import END, START, StateGraph
 
 from agent.deps import Deps
 from agent.memo import idk_memo
-from agent.nodes import (grade_node, price_node, refuse_node, retrieve_node, rewrite_node,
-                         route_after_grade, route_after_router, router_node, synthesize_node)
+from agent.nodes import (analysis_node, grade_node, price_node, refuse_node, retrieve_node,
+                         rewrite_node, route_after_grade, route_after_router, route_after_tools,
+                         router_node, synthesize_node, tools_node)
 from agent.state import AgentState
 
 
@@ -15,15 +16,19 @@ def build_graph(deps: Deps):
     for name, node in (
         ("router", router_node), ("retrieve", retrieve_node), ("grade", grade_node),
         ("rewrite", rewrite_node), ("price", price_node), ("synthesize", synthesize_node),
-        ("refuse", refuse_node),
+        ("refuse", refuse_node), ("tools", tools_node), ("analysis", analysis_node),
     ):
         graph.add_node(name, partial(node, deps=deps))
     graph.add_edge(START, "router")
     graph.add_conditional_edges("router", route_after_router, {
-        "retrieve": "retrieve", "price": "price", "synthesize": "synthesize", "refuse": "refuse"})
+        "retrieve": "retrieve", "price": "price", "tools": "tools", "analysis": "analysis",
+        "refuse": "refuse"})
     graph.add_edge("retrieve", "grade")
     graph.add_conditional_edges("grade", route_after_grade, {
-        "price": "price", "synthesize": "synthesize", "rewrite": "rewrite"})
+        "tools": "tools", "rewrite": "rewrite"})
+    graph.add_conditional_edges("tools", route_after_tools, {
+        "price": "price", "synthesize": "synthesize"})
+    graph.add_edge("analysis", "synthesize")
     graph.add_edge("rewrite", "retrieve")
     graph.add_edge("price", "synthesize")
     graph.add_edge("synthesize", END)

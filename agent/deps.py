@@ -12,3 +12,6 @@ class Deps:
     retrieve: Callable[[str, list[str]], list]  # (query, tickers) -> list[Passage]
     fetch_quotes: Callable[[list[str]], dict[str, Quote]]
     indexed_tickers: list[str]
+    holdings: object = None  # enriched holdings DataFrame for the portfolio calculator
+    analyst_data: object = None  # YahooData-like adapter for the analysts
+    filings_dir: object = None  # Path to downloaded filings for the filing tools

@@ -1,7 +1,7 @@
 """Graph nodes. Each takes (state, deps) and returns a partial state update."""
 from agent.deps import Deps
 from agent.llm import ask_structured
-from agent.memo import idk_memo, labels_for, passage_label, quote_label
+from agent.memo import check_numbers, idk_memo, labels_for, passage_label, quote_label
 from agent.schemas import GradeResult, Memo, RewriteResult, RouteDecision
 from agent.state import AgentState
 from analyzer import ai
@@ -14,7 +14,12 @@ ROUTER_PROMPT = (
     "business, legal, why something happened.\n"
     "- live_price: needs the current stock price or today's move.\n"
     "- both: needs filings and the current price.\n"
-    "- portfolio_only: answerable from the user's own holdings data (values, weights, gains).\n"
+    "- portfolio_only: answerable from the user's own holdings data (values, weights, gains, "
+    "what-if shocks).\n"
+    "- analysis: asks for a technical, fundamental, risk or analyst/ownership analysis of a "
+    "ticker (trend, RSI, moving averages, valuation ratios, margins, volatility, beta, "
+    "drawdown, analyst targets, insider or institutional holders, earnings date). Also fill "
+    "`analyses` with the kinds needed (all four for a full analysis).\n"
     "- out_of_scope: ONLY requests for advice or recommendations (for example 'should I "
     "buy X?'), predictions of future prices or results, other people's opinions (analyst "
     "views, market sentiment), or topics unrelated to investing. Questions about what a "
@@ -26,7 +31,7 @@ ROUTER_PROMPT = (
 FILING_ROUTES = {"sec_filings", "both"}
 NEXT_NODE = {
     "sec_filings": "retrieve", "both": "retrieve", "live_price": "price",
-    "portfolio_only": "synthesize", "out_of_scope": "refuse",
+    "portfolio_only": "tools", "analysis": "analysis", "out_of_scope": "refuse",
 }
 
 
@@ -60,8 +65,8 @@ def router_node(state: AgentState, deps: Deps) -> dict:
             route = "portfolio_only" if route == "sec_filings" else "live_price"
         else:
             tickers = indexed if route == "sec_filings" else list(dict.fromkeys(indexed + tickers))
-    if route == "live_price" and not tickers:
-        tickers = held
+    if route in ("live_price", "analysis") and not tickers:
+        tickers = held[:3] if route == "analysis" else held
     line = f"Router: {route} ({decision.reason})"
     if notes:
         line += f"; {notes[0]}, so route changed from {decision.route}"
@@ -140,10 +145,21 @@ def rewrite_node(state: AgentState, deps: Deps) -> dict:
 
 
 def route_after_grade(state: AgentState) -> str:
-    after = "price" if state["route"].route == "both" else "synthesize"
-    if state.get("graded"):
-        return after
-    return "rewrite" if state.get("rewrites", 0) < MAX_REWRITES else after
+    if state.get("graded") or state.get("rewrites", 0) >= MAX_REWRITES:
+        return "tools"
+    return "rewrite"
+
+
+def route_after_tools(state: AgentState) -> str:
+    return "price" if state["route"].route == "both" else "synthesize"
+
+
+def tools_node(state: AgentState, deps: Deps) -> dict:
+    return {"trace": []}
+
+
+def analysis_node(state: AgentState, deps: Deps) -> dict:
+    return {"trace": []}
 
 
 def price_node(state: AgentState, deps: Deps) -> dict:
@@ -179,6 +195,10 @@ def _evidence_block(state: AgentState) -> str:
     if graded:
         parts.append("Filing passages:\n" + "\n\n".join(
             f"[{passage_label(p)}]\n{p.text[: ai.MAX_MESSAGE_CHARS]}" for p in graded))
+    facts = state.get("facts", [])
+    if facts:
+        parts.append("Computed facts (exact values from tools):\n" + "\n".join(
+            f"[{f.label}] {f.text}" for f in facts))
     priced = [q for q in state.get("quotes", {}).values() if q.price is not None]
     if priced:
         parts.append("Live quotes:\n" + "\n".join(
@@ -191,7 +211,10 @@ def synthesize_node(state: AgentState, deps: Deps) -> dict:
     graded = state.get("graded", [])
     quotes = state.get("quotes", {})
     has_price = any(q.price is not None for q in quotes.values())
-    if (route in FILING_ROUTES or route in LIVE_ROUTES) and not (graded or has_price):
+    has_facts = bool(state.get("facts"))
+    if (route in FILING_ROUTES or route in LIVE_ROUTES or route == "analysis") and not (
+        graded or has_price or has_facts
+    ):
         return {"memo": idk_memo(), "trace": ["Synthesizer: no supporting evidence, so \"I don't know\""]}
 
     history = [
@@ -214,6 +237,11 @@ def synthesize_node(state: AgentState, deps: Deps) -> dict:
         return {"memo": idk_memo(), "trace": ["Synthesizer: unsupported citation or no answer, so \"I don't know\""]}
 
     unverified = list(memo.unverified)
+    evidence = _evidence_block(state)
+    unverified += [
+        f"The figure {n} could not be matched to a supplied source"
+        for n in check_numbers([memo.answer, *memo.key_figures], evidence)
+    ]
     unverified += [f"Live price for {t} was unavailable" for t, q in quotes.items() if q.price is None]
     if route in FILING_ROUTES and not graded:
         unverified.append("No relevant SEC filing passages were found")

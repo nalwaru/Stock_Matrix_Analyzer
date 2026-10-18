@@ -70,9 +70,8 @@ def test_rewrite_failure_keeps_old_query_but_still_counts():
 
 def test_route_after_grade_all_branches():
     some, none = [passage(1)], []
-    assert route_after_grade({"route": route("sec_filings"), "graded": some}) == "synthesize"
-    assert route_after_grade({"route": route("both"), "graded": some}) == "price"
+    assert route_after_grade({"route": route("sec_filings"), "graded": some}) == "tools"
+    assert route_after_grade({"route": route("both"), "graded": some}) == "tools"
     assert route_after_grade({"route": route(), "graded": none, "rewrites": 0}) == "rewrite"
     assert route_after_grade({"route": route(), "graded": none, "rewrites": MAX_REWRITES - 1}) == "rewrite"
-    assert route_after_grade({"route": route(), "graded": none, "rewrites": MAX_REWRITES}) == "synthesize"
-    assert route_after_grade({"route": route("both"), "graded": none, "rewrites": MAX_REWRITES}) == "price"
+    assert route_after_grade({"route": route(), "graded": none, "rewrites": MAX_REWRITES}) == "tools"

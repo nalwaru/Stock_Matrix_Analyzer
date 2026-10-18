@@ -3,13 +3,15 @@ from typing import Literal
 
 from pydantic import BaseModel
 
-Route = Literal["sec_filings", "live_price", "both", "portfolio_only", "out_of_scope"]
+Route = Literal["sec_filings", "live_price", "both", "portfolio_only", "analysis", "out_of_scope"]
+Analysis = Literal["technical", "fundamental", "risk", "ownership"]
 
 
 class RouteDecision(BaseModel):
     route: Route
     tickers: list[str]
     reason: str
+    analyses: list[Analysis] = []
 
 
 class PassageGrade(BaseModel):
@@ -31,3 +33,27 @@ class Memo(BaseModel):
     key_figures: list[str]
     sources: list[str]
     unverified: list[str]
+
+
+class CalcCall(BaseModel):
+    """One portfolio calculation; unused arguments are null."""
+    tool: Literal["holding", "class_weight", "top_n", "total", "stress"]
+    ticker: str | None = None
+    asset_class: str | None = None
+    metric: Literal["Current_Value", "Gain_Loss", "Gain_Loss_Pct", "Day_Change"] | None = None
+    n: int | None = None
+    shock_pct: float | None = None
+
+
+class FilingCall(BaseModel):
+    """One lookup in locally stored SEC filings; unused arguments are null."""
+    tool: Literal["get_section", "compare_periods", "list_filings"]
+    ticker: str
+    form: Literal["10-K", "10-Q", "8-K"] | None = None
+    section: str | None = None
+    row_label: str | None = None
+
+
+class ToolPlan(BaseModel):
+    calc_calls: list[CalcCall]
+    filing_calls: list[FilingCall]

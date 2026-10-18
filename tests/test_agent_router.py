@@ -72,6 +72,6 @@ def test_live_price_with_no_tickers_uses_held():
 
 def test_route_after_router_mapping():
     expected = {"sec_filings": "retrieve", "both": "retrieve", "live_price": "price",
-                "portfolio_only": "synthesize", "out_of_scope": "refuse"}
+                "portfolio_only": "tools", "analysis": "analysis", "out_of_scope": "refuse"}
     for route, node in expected.items():
         assert route_after_router({"route": decision(route)}) == node
