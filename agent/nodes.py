@@ -231,7 +231,7 @@ def analysis_node(state: AgentState, deps: Deps) -> dict:
     route = state["route"]
     held = list(state.get("held_tickers", []))
     tickers = (route.tickers or held)[:MAX_ANALYSIS_TICKERS]
-    wanted = route.analyses or ALL_ANALYSES
+    wanted = state.get("analyses") or route.analyses or ALL_ANALYSES
     today = _today()
     facts, trace, charts = [], [], []
     for ticker in tickers:

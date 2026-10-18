@@ -3,7 +3,7 @@ from typing import Literal
 
 from pydantic import BaseModel
 
-Route = Literal["sec_filings", "live_price", "both", "portfolio_only", "analysis", "out_of_scope"]
+Route = Literal["sec_filings", "live_price", "both", "portfolio_only", "analysis", "agent", "out_of_scope"]
 Analysis = Literal["technical", "fundamental", "risk", "ownership"]
 
 
