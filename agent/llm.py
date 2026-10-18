@@ -9,7 +9,7 @@ from analyzer import ai
 T = TypeVar("T", bound=BaseModel)
 
 
-def ask_structured(messages: list[dict], schema: type[T], model: str, client=None) -> T:
+def ask_structured(messages: list[dict], schema: type[T], model: str, client=None, extra_body: dict | None = None) -> T:
     if client is None:
         if not ai.is_configured():
             raise ai.AIError("OPENAI_API_KEY is not set.")
@@ -18,6 +18,7 @@ def ask_structured(messages: list[dict], schema: type[T], model: str, client=Non
         response = client.chat.completions.parse(
             model=model, messages=messages, response_format=schema,
             temperature=0, max_tokens=ai.MAX_OUTPUT_TOKENS,
+            **({"extra_body": extra_body} if extra_body else {}),
         )
     except OpenAIError as exc:
         raise ai.safe_error(exc) from None

@@ -51,6 +51,7 @@ ROUTER_PROMPT = (
     "metrics are `analysis` even when they mention the price. "
     "When unsure whether a question is about company disclosures, prefer sec_filings."
 )
+OPENROUTER_BODY = {"provider": {"require_parameters": True}}  # only providers that honour response_format
 FILING_ROUTES = {"sec_filings", "both"}
 NEXT_NODE = {
     "sec_filings": "retrieve", "both": "retrieve", "live_price": "price",
@@ -69,7 +70,11 @@ def router_node(state: AgentState, deps: Deps) -> dict:
         )},
     ]
     try:
-        decision = ask_structured(messages, RouteDecision, deps.model, deps.client)
+        if deps.router_model:
+            decision = ask_structured(messages, RouteDecision, deps.router_model, deps.router_client,
+                                      extra_body=OPENROUTER_BODY)
+        else:
+            decision = ask_structured(messages, RouteDecision, deps.model, deps.client)
     except ai.AIError as exc:
         return {
             "route": RouteDecision(route="portfolio_only", tickers=[], reason="routing failed"),

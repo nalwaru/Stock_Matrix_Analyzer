@@ -82,3 +82,13 @@ def test_analysis_route_keeps_the_analyses_the_router_chose():
     out = router_node(state(), deps(FakeClient(d)))
     assert out["route"].route == "analysis" and out["route"].analyses == ["technical"]
     assert out["route"].tickers == ["NVDA"]
+
+
+def test_router_uses_its_own_client_and_model_when_configured():
+    from dataclasses import replace
+    main = FakeClient()
+    own = FakeClient(RouteDecision(route="live_price", tickers=["AAPL"], reason="r"))
+    out = router_node(state(), replace(deps(main), router_client=own, router_model="x/y"))
+    assert out["route"].route == "live_price"
+    assert not main.calls and own.calls[0]["model"] == "x/y"
+    assert own.calls[0]["extra_body"] == {"provider": {"require_parameters": True}}

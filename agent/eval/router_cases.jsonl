@@ -25,3 +25,7 @@
 {"question": "technical analysis for oracle", "expected_route": "analysis", "expected_tickers": ["ORCL"]}
 {"question": "how risky is Rivian?", "expected_route": "analysis", "expected_tickers": ["RIVN"]}
 {"question": "is Nvidia overbought?", "expected_route": "analysis", "expected_tickers": ["NVDA"]}
+{"question": "What if tech stocks drop 20%?", "expected_route": "portfolio_only"}
+{"question": "How much would I lose if my equities fell 15%?", "expected_route": "portfolio_only"}
+{"question": "Stress test my portfolio with a 10% market drop", "expected_route": "portfolio_only"}
+{"question": "If bonds rally 5%, what is my total value?", "expected_route": "portfolio_only"}
