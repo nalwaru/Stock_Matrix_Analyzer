@@ -67,8 +67,9 @@ def render_memo(memo: Memo) -> str:
         f"### Answer\n{memo.answer}",
         section("Key figures", memo.key_figures),
         section("Sources", memo.sources),
-        section("What I couldn't verify", memo.unverified),
     ]
+    if memo.unverified:  # nothing to flag means no section, not a "None" line
+        parts.append(section("What I couldn't verify", memo.unverified))
     if memo.outlook or memo.outlook_leaning:
         leaning = f"Leaning: {memo.outlook_leaning}\n" if memo.outlook_leaning else ""
         body = "\n".join(f"- {r}" for r in memo.outlook)

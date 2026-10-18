@@ -153,3 +153,11 @@ def test_filing_note_appears_once_when_the_answer_needs_filings():
     assert notes == ["No SEC filings are available for ORCL"]
     assert "No SEC filings are available" not in render_memo(out).split("### What I couldn't verify")[0]
     assert render_memo(out).count("No SEC filings are available for ORCL") == 1
+
+
+def test_render_memo_hides_what_i_couldnt_verify_when_empty():
+    full = Memo(answer="a", key_figures=["Price: 1 [x]"], sources=["x"], unverified=[])
+    md = render_memo(full)
+    assert "What I couldn't verify" not in md and "None" not in md
+    noted = Memo(answer="a", key_figures=[], sources=[], unverified=["Price unavailable"])
+    assert "### What I couldn't verify\n- Price unavailable" in render_memo(noted)
