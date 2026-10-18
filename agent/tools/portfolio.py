@@ -44,11 +44,13 @@ def run_calc(df: pd.DataFrame, call: CalcCall, today: str) -> Fact | None:
     if call.tool == "top_n":
         metric = call.metric if call.metric in _METRICS else "Current_Value"
         n = max(1, min(call.n or 3, 10))
-        top = df.dropna(subset=[metric]).sort_values(metric, ascending=False).head(n)
+        smallest = call.order == "smallest"
+        top = df.dropna(subset=[metric]).sort_values(metric, ascending=smallest).head(n)
         if top.empty:
             return None
         listing = "; ".join(f"{t} {_money(v)}" for t, v in zip(top["Ticker"], top[metric]))
-        return Fact(_label(today, f"top{n}_{metric}"), f"Top {n} by {metric}: {listing}")
+        word, prefix = ("Smallest", "bottom") if smallest else ("Top", "top")
+        return Fact(_label(today, f"{prefix}{n}_{metric}"), f"{word} {n} by {metric}: {listing}")
     if call.tool == "total":
         s = portfolio.summary(df)
         return Fact(_label(today, "total"),

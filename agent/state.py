@@ -20,6 +20,7 @@ class Fact:
 
 class AgentState(TypedDict, total=False):
     question: str
+    today: str  # UTC date used in citation labels
     history: list[dict]
     portfolio_json: str
     held_tickers: list[str]

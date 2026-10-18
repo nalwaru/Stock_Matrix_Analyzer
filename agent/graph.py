@@ -1,5 +1,6 @@
 """LangGraph assembly: router -> (filings loop | price | portfolio | refusal) -> memo."""
 from collections.abc import Iterator
+from datetime import datetime, timezone
 from functools import partial
 
 from langgraph.graph import END, START, StateGraph
@@ -43,6 +44,7 @@ def run(question: str, history: list[dict], portfolio_json: str,
     initial: AgentState = {
         "question": question, "history": history, "portfolio_json": portfolio_json,
         "held_tickers": held_tickers, "rewrites": 0, "trace": [],
+        "today": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
     }
     try:
         return build_graph(deps).invoke(initial)
@@ -70,6 +72,7 @@ def run_stream(question: str, history: list[dict], portfolio_json: str,
     state: AgentState = {
         "question": question, "history": history, "portfolio_json": portfolio_json,
         "held_tickers": held_tickers, "rewrites": 0, "trace": [],
+        "today": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
     }
     try:
         for chunk in build_graph(deps).stream(state, stream_mode="updates"):

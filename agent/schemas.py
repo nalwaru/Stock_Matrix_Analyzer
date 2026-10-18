@@ -43,6 +43,7 @@ class CalcCall(BaseModel):
     metric: Literal["Current_Value", "Gain_Loss", "Gain_Loss_Pct", "Day_Change"] | None = None
     n: int | None = None
     shock_pct: float | None = None
+    order: Literal["largest", "smallest"] | None = None
 
 
 class FilingCall(BaseModel):
