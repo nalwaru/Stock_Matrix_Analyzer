@@ -2,8 +2,9 @@
 from agent.deps import Deps
 from agent.llm import ask_structured
 from agent.memo import check_numbers, idk_memo, labels_for, passage_label, quote_label
-from agent.schemas import GradeResult, Memo, RewriteResult, RouteDecision
+from agent.schemas import GradeResult, Memo, RewriteResult, RouteDecision, ToolPlan
 from agent.state import AgentState
+from agent.tools.portfolio import run_calc
 from analyzer import ai
 from rag.retrieve import RetrievalError
 
@@ -154,8 +155,53 @@ def route_after_tools(state: AgentState) -> str:
     return "price" if state["route"].route == "both" else "synthesize"
 
 
+MAX_TOOL_CALLS = 3
+PLANNER_PROMPT = (
+    "You pick calculator tools that help answer a question about the user's portfolio, so "
+    "that no arithmetic is left to the answer writer. Return at most 3 calls in total; "
+    "return empty lists when no tool is needed. Use only ticker symbols and asset classes "
+    "listed below. Leave unused arguments null.\n"
+    "Portfolio tools (calc_calls): holding(ticker) for one position's value, gain/loss and "
+    "weight; class_weight(asset_class) for an asset class's share of the portfolio; "
+    "top_n(metric, n) for the biggest holdings by Current_Value, Gain_Loss, Gain_Loss_Pct "
+    "or Day_Change; total() for portfolio totals; stress(asset_class, shock_pct) for a "
+    "what-if move of an asset class in percent (for example -20)."
+)
+
+
+def _today() -> str:
+    from datetime import datetime, timezone
+
+    return datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+
 def tools_node(state: AgentState, deps: Deps) -> dict:
-    return {"trace": []}
+    route = state["route"].route
+    use_calc = route == "portfolio_only" and deps.holdings is not None
+    if not use_calc:
+        return {"trace": []}
+    df = deps.holdings
+    menu = (f"Tickers: {', '.join(df['Ticker'])}\n"
+            f"Asset classes: {', '.join(sorted(set(df['Asset_Class'])))}")
+    messages = [
+        {"role": "system", "content": PLANNER_PROMPT},
+        {"role": "user", "content": f"{menu}\n\nQuestion: {state['question']}"},
+    ]
+    try:
+        plan = ask_structured(messages, ToolPlan, deps.model, deps.client)
+    except ai.AIError as exc:
+        return {"trace": [f"Tool planner failed ({exc}); continuing without tools"]}
+    facts, skipped = [], 0
+    for call in plan.calc_calls[:MAX_TOOL_CALLS]:
+        fact = run_calc(df, call, _today())
+        if fact is None:
+            skipped += 1
+        else:
+            facts.append(fact)
+    line = f"Tools: ran {len(facts)} portfolio calculations"
+    if skipped:
+        line += f"; skipped {skipped} (unknown ticker, class or missing arguments)"
+    return {"facts": facts, "trace": [line]}
 
 
 def analysis_node(state: AgentState, deps: Deps) -> dict:
