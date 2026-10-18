@@ -62,10 +62,15 @@ def _ask_ai_app(monkeypatch, run_impl):
     import streamlit as st
     from agent import graph
 
+    def stream(question, history, portfolio_json, held, deps):
+        state = run_impl(question, history, portfolio_json, held, deps)  # may raise: simulates a crash
+        yield "router", {"trace": state["trace"][:1]}
+        yield "done", state
+
     st.cache_resource.clear()
     monkeypatch.setattr(market, "fetch_quotes", fake_quotes)
     monkeypatch.setenv("OPENAI_API_KEY", "k")
-    monkeypatch.setattr(graph, "run", run_impl)
+    monkeypatch.setattr(graph, "run_stream", stream)
     at = AppTest.from_file(str(ROOT / "app.py"), default_timeout=30)
     at.run()
     at.sidebar.toggle[0].set_value(True).run()

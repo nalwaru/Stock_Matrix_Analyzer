@@ -245,19 +245,37 @@ def render_ask_ai(df: pd.DataFrame) -> None:
     chat = st.session_state.setdefault("chat", [])
     with st.container():
         question = st.chat_input("Ask about your portfolio", max_chars=ai.MAX_QUESTION)
+    live = st.empty()  # holds the in-progress exchange; cleared once the answer is stored
     if question:
-        with st.spinner("Routing, searching and analyzing..."):
-            try:
-                result = agent_graph.run(
-                    question, list(chat), context, list(df["Ticker"].unique()),
-                    agent_wiring.make_deps(
-                        pinecone_client, os.getenv("RAG_NAMESPACE", "semantic"),
-                        os.getenv("PINECONE_API_KEY", ""),
-                        holdings=df, analyst_data=yahoo_data(), filings_dir=FILINGS_DIR,
-                    ),
-                )
-            except Exception:  # noqa: BLE001 - run() never raises; this is a last-resort guard
-                result = {"memo": idk_memo(), "graded": [], "trace": ["Agent failed unexpectedly"]}
+        result = None
+        with live.container():
+            with st.chat_message("user"):
+                st.markdown(question)
+            with st.chat_message("assistant"):
+                status = st.status("Routing your question...", expanded=True)
+                try:
+                    for node, update in agent_graph.run_stream(
+                        question, list(chat), context, list(df["Ticker"].unique()),
+                        agent_wiring.make_deps(
+                            pinecone_client, os.getenv("RAG_NAMESPACE", "semantic"),
+                            os.getenv("PINECONE_API_KEY", ""),
+                            holdings=df, analyst_data=yahoo_data(), filings_dir=FILINGS_DIR,
+                        ),
+                    ):
+                        if node == "done":
+                            result = update
+                            break
+                        step = agent_graph.NODE_LABELS.get(node, node)
+                        status.write(f"Done: {step}")
+                        for line in update.get("trace", []):
+                            status.caption(line)
+                        status.update(label=f"Working... (last step: {step.lower()})")
+                except Exception:  # noqa: BLE001 - run_stream never raises; last-resort guard
+                    result = None
+                if result is None:
+                    result = {"memo": idk_memo(), "graded": [], "trace": ["Agent failed unexpectedly"]}
+                status.update(label="Finished", state="complete", expanded=False)
+        live.empty()
         chat += [
             {"role": "user", "content": question},
             {"role": "assistant", "content": render_memo(result["memo"]),
