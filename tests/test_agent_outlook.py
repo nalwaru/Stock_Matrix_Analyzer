@@ -169,3 +169,28 @@ def test_sources_are_hidden_when_the_answer_is_idk():
     assert visible_sources({"memo": idk_memo(), "graded": passages}) == []
     assert visible_sources({"memo": memo(), "graded": passages}) == passages
     assert visible_sources({"memo": memo()}) == []
+
+
+def test_render_memo_hides_every_empty_section():
+    bare = Memo(answer="The latest 10-K was filed on 2025-10-31.", key_figures=[], sources=[], unverified=[])
+    md = render_memo(bare)
+    assert md == "### Answer\nThe latest 10-K was filed on 2025-10-31."
+    with_sources = Memo(answer="a", key_figures=[], sources=["x"], unverified=[])
+    md = render_memo(with_sources)
+    assert "### Sources\n- x" in md and "Key figures" not in md and "None" not in md
+
+
+def test_outlook_sits_after_sources_and_before_what_i_couldnt_verify():
+    full = Memo(answer="a", key_figures=["k [x]"], sources=["s"], unverified=["u"],
+                outlook=[f"P/E is 30.0 [{PE}]"], outlook_leaning="neutral")
+    md = render_memo(full)
+    assert md.index("### Sources") < md.index("### Outlook") < md.index("### What I couldn't verify")
+    lean = Memo(answer="a", key_figures=[], sources=[], unverified=[], outlook=[f"x [{PE}]"], outlook_leaning="neutral")
+    md = render_memo(lean)
+    assert md.index("### Answer") < md.index("### Outlook") and "Sources" not in md
+
+
+def test_outlook_precedes_unverified_even_when_other_sections_are_hidden():
+    only = Memo(answer="a", key_figures=[], sources=[], unverified=["u"], outlook=[f"x [{PE}]"], outlook_leaning="neutral")
+    md = render_memo(only)
+    assert md.index("### Outlook") < md.index("### What I couldn't verify")

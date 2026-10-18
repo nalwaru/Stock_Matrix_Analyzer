@@ -78,20 +78,21 @@ def render_memo(memo: Memo) -> str:
         return "\n\n".join(p for p in (ai.IDK_MESSAGE, no_filings, declined) if p)
 
     def section(title: str, items: list[str]) -> str:
-        body = "\n".join(f"- {i}" for i in items) if items else "- None"
-        return f"### {title}\n{body}"
+        return f"### {title}\n" + "\n".join(f"- {i}" for i in items)
 
-    parts = [
-        f"### Answer\n{memo.answer}",
-        section("Key figures", memo.key_figures),
-        section("Sources", memo.sources),
-    ]
-    if memo.unverified:  # nothing to flag means no section, not a "None" line
-        parts.append(section("What I couldn't verify", memo.unverified))
+    parts = [f"### Answer\n{memo.answer}"]
+    outlook = ""
     if memo.outlook or memo.outlook_leaning:
         leaning = f"Leaning: {memo.outlook_leaning}\n" if memo.outlook_leaning else ""
         body = "\n".join(f"- {r}" for r in memo.outlook)
-        parts.insert(3, f"### {OUTLOOK_TITLE}\n{leaning}{body}\n\n{ADVISOR_NOTE}")
+        outlook = f"### {OUTLOOK_TITLE}\n{leaning}{body}\n\n{ADVISOR_NOTE}"
+    for title, items in (("Key figures", memo.key_figures), ("Sources", memo.sources), ("Outlook", None),
+                         ("What I couldn't verify", memo.unverified)):
+        if title == "Outlook":
+            if outlook:
+                parts.append(outlook)
+        elif items:  # nothing to show means no section, not a "None" line
+            parts.append(section(title, items))
     if no_filings:
         parts.append(no_filings)
     if declined:
