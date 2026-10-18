@@ -23,6 +23,16 @@ def route_accuracy(cases: list[dict], decide: Callable[[str], str]) -> dict:
     return {"accuracy": (total - len(misses)) / total if total else 0.0, "misses": misses}
 
 
+def ticker_misses(cases: list[dict], decide_tickers: Callable[[str], list[str]]) -> list[tuple]:
+    """Cases that pin `expected_tickers` where the router resolved different tickers."""
+    misses = []
+    for case in cases:
+        want = case.get("expected_tickers")
+        if want is not None and decide_tickers(case["question"]) != want:
+            misses.append((case["question"], want, decide_tickers(case["question"])))
+    return misses
+
+
 def main() -> int:
     load_dotenv()
     from agent.nodes import router_node
@@ -30,13 +40,18 @@ def main() -> int:
 
     deps = make_deps(lambda: None, "semantic", pinecone_key="")
 
+    def full(question: str):
+        return router_node({"question": question, "held_tickers": HELD}, deps)["route"]
+
     def decide(question: str) -> str:
-        return router_node({"question": question, "held_tickers": HELD}, deps)["route"].route
+        return full(question).route
 
     result = route_accuracy(load_cases(), decide)
     print(f"router accuracy: {result['accuracy']:.0%}")
     for question, expected, got in result["misses"]:
         print(f"  MISS {question!r}: expected {expected}, got {got}")
+    for question, want, got in ticker_misses(load_cases(), lambda q: full(q).tickers):
+        print(f"  TICKER MISS {question!r}: expected {want}, got {got}")
     return 0
 
 

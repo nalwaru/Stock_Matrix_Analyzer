@@ -284,7 +284,7 @@ def render_ask_ai(df: pd.DataFrame) -> None:
             {"role": "user", "content": question},
             {"role": "assistant", "content": render_memo(result["memo"]),
              "sources": result.get("graded", []), "trace": result.get("trace", []),
-             "charts": result.get("charts", [])},
+             "charts": [] if result["memo"].answer == ai.IDK_MESSAGE else result.get("charts", [])},
         ]
         st.session_state["chat"] = chat = chat[-2 * ai.MAX_CHAT_TURNS:]
     for i in range(len(chat) - 2, -1, -2):

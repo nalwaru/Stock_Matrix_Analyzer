@@ -42,3 +42,10 @@ Router: 100% on 27 cases (small, author-written).
 
 ## Still unverified
 Analyst numbers were not compared with a charting site (do this for RSI, SMA50/200 and P/E); portfolio calculator was run on the sample portfolio only; the fixed-vs-semantic and rerank evaluation has still not been run; 8-K exhibits (earnings press releases) are not downloaded; yfinance is unofficial and its fields can change.
+
+## Defects found from real use (2026-10-18)
+- "technical analysis orcale" returned "I don't know" even though 13 ORCL facts and a chart existed: the router resolved the typo to ORCL, but the writer was never told, and its no-outside-knowledge rule made it refuse. The writer now gets a "tickers the question refers to" line. Fixed with a test.
+- "technical analysis for oracle" (correct spelling) resolved to `O` (Realty Income, a held ticker): the router substituted a similar-looking held ticker. Router prompt now says to give the named company's real ticker; the router eval pins expected tickers (Oracle/"orcale" -> ORCL, Rivian -> RIVN, Nvidia -> NVDA).
+- A chart was shown under an "I don't know" answer; charts are now hidden when the answer is a refusal.
+- My earlier app test for agent charts asserted "at least one chart", which the Dashboard's own two charts always satisfied; it now counts exactly.
+- Router eval: 31 cases, 100% on three consecutive runs after sharpening the analysis wording ("how risky", "is X expensive", "what do analysts think" are analysis). The router is not perfectly deterministic: borderline wording flipped between runs before the fix.

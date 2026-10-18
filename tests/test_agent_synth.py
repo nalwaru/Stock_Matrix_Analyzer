@@ -82,3 +82,21 @@ def test_portfolio_only_calls_model_and_live_price_citation_is_allowed():
 
 def test_refuse_node_is_idk():
     assert refuse_node(state("out_of_scope"), make_deps())["memo"].answer == ai.IDK_MESSAGE
+
+
+def test_evidence_tells_the_writer_which_tickers_the_question_resolved_to():
+    from agent.nodes import SYNTH_PROMPT, _evidence_block
+
+    s = {"question": "technical analysis orcale", "portfolio_json": "{}", "graded": [], "quotes": {},
+         "facts": [], "route": RouteDecision(route="analysis", tickers=["ORCL"], reason="r")}
+    block = _evidence_block(s)
+    assert "ORCL" in block and "resolved" in block.lower()
+    assert "misspell" in SYNTH_PROMPT.lower() or "company name" in SYNTH_PROMPT.lower()
+
+
+def test_no_resolved_tickers_line_when_the_route_has_none():
+    from agent.nodes import _evidence_block
+
+    s = {"question": "q", "portfolio_json": "{}", "graded": [], "quotes": {}, "facts": [],
+         "route": RouteDecision(route="portfolio_only", tickers=[], reason="r")}
+    assert "resolved" not in _evidence_block(s).lower()

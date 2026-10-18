@@ -10,7 +10,7 @@
 {"question": "How many positions do I hold?", "expected_route": "portfolio_only"}
 {"question": "Should I buy more Apple?", "expected_route": "out_of_scope"}
 {"question": "What will Apple's stock be worth next year?", "expected_route": "out_of_scope"}
-{"question": "What do analysts think of Apple?", "expected_route": "out_of_scope"}
+{"question": "What do analysts think of Apple?", "expected_route": "analysis"}
 {"question": "Tell me a joke.", "expected_route": "out_of_scope"}
 {"question": "How is Apple exposed to China manufacturing?", "expected_route": "sec_filings"}
 {"question": "What does Apple say about depending on outsourcing partners?", "expected_route": "sec_filings"}
@@ -21,3 +21,7 @@
 {"question": "How volatile is RIVN compared with the market?", "expected_route": "analysis"}
 {"question": "Give me a full analysis of NVDA.", "expected_route": "analysis"}
 {"question": "What happens to my portfolio if crypto falls 30%?", "expected_route": "portfolio_only"}
+{"question": "technical analysis orcale", "expected_route": "analysis", "expected_tickers": ["ORCL"]}
+{"question": "technical analysis for oracle", "expected_route": "analysis", "expected_tickers": ["ORCL"]}
+{"question": "how risky is Rivian?", "expected_route": "analysis", "expected_tickers": ["RIVN"]}
+{"question": "is Nvidia overbought?", "expected_route": "analysis", "expected_tickers": ["NVDA"]}

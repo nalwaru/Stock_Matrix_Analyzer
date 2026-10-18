@@ -6,6 +6,7 @@ from streamlit.testing.v1 import AppTest
 from analyzer import market
 
 ROOT = Path(__file__).parent.parent
+DASHBOARD_CHARTS = 2  # allocation donut and top-holdings bars always on the page
 
 
 def fake_quotes(tickers):
@@ -134,5 +135,17 @@ def test_charts_from_the_agent_are_rendered_and_dollars_are_escaped(monkeypatch)
     state["charts"] = [fig]
     at = _ask_ai_app(monkeypatch, lambda *a, **k: state)
     assert not at.exception
-    assert len(at.get("plotly_chart")) >= 1
+    assert len(at.get("plotly_chart")) == DASHBOARD_CHARTS + 1  # donut + bars + the agent chart
     assert any(r"\$343.46" in m.value for m in at.markdown)
+
+
+def test_charts_are_hidden_when_the_answer_is_i_dont_know(monkeypatch):
+    import plotly.graph_objects as go
+    from analyzer import ai
+
+    state = _state(answer=ai.IDK_MESSAGE)
+    state["charts"] = [go.Figure(go.Scatter(x=[1, 2], y=[1, 2], name="Close"))]
+    at = _ask_ai_app(monkeypatch, lambda *a, **k: state)
+    assert not at.exception
+    assert any(ai.IDK_MESSAGE in m.value for m in at.markdown)
+    assert len(at.get("plotly_chart")) == DASHBOARD_CHARTS  # only the dashboard's own charts
