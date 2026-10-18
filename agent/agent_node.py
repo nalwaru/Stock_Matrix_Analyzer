@@ -40,6 +40,7 @@ def _merge(acc: dict, update: dict) -> None:
     acc["graded"] = acc.get("graded", []) + [p for p in update.get("graded", []) if p.id not in seen]
     acc["quotes"] = {**acc.get("quotes", {}), **update.get("quotes", {})}
     acc["searched_filings"] = acc.get("searched_filings", False) or update.get("searched_filings", False)
+    acc["no_filings"] = list(dict.fromkeys(acc.get("no_filings", []) + list(update.get("no_filings", []))))
 
 
 def _messages(state: AgentState) -> list[dict]:
@@ -72,6 +73,7 @@ def agent_node(state: AgentState, deps: Deps) -> dict:
     analysts_ran = False
     exhausted = True
     limit_hit = False
+    stopped_early = False
 
     for _ in range(MAX_AGENT_TURNS):
         try:
@@ -79,6 +81,7 @@ def agent_node(state: AgentState, deps: Deps) -> dict:
         except ai.AIError as exc:
             acc["trace"].append(f"Agent stopped early ({exc}); using the evidence gathered so far")
             exhausted = False
+            stopped_early = True
             break
         calls = list(reply.tool_calls or [])
         if not calls:
@@ -124,4 +127,5 @@ def agent_node(state: AgentState, deps: Deps) -> dict:
             _merge(acc, update)
 
     acc["step_limit_hit"] = limit_hit or exhausted
+    acc["agent_stopped_early"] = stopped_early
     return acc

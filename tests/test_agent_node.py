@@ -136,3 +136,13 @@ def test_on_step_exception_is_ignored():
     client, deps = deps_with([assistant(tool_calls=[total_call()]), assistant("done")])
     out = agent_node(state(), replace(deps, on_step=broken))
     assert len(out["facts"]) == 1
+
+
+def test_agent_node_reports_unindexed_tickers_and_early_stop():
+    error = openai.APIConnectionError(request=NS())
+    call = tool_call("c1", "search_filings", {"query": "risks", "tickers": ["ORCL"]})
+    client, deps = deps_with([assistant(tool_calls=[call]), error])
+    out = agent_node(state(("ORCL",)), deps)
+    assert out["no_filings"] == ["ORCL"] and out["agent_stopped_early"] is True
+    client, deps = deps_with([assistant("done")])
+    assert agent_node(state(), deps)["agent_stopped_early"] is False

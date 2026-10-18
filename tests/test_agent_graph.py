@@ -125,3 +125,11 @@ def test_unexpected_exception_returns_idk_memo():
 
 def test_build_graph_compiles():
     assert build_graph(make_deps(ScriptedClient())) is not None
+
+
+def test_unindexed_ticker_end_to_end_says_no_filings_are_available():
+    call = tool_call("c1", "search_filings", {"query": "risks", "tickers": ["ORCL"]})
+    client = with_tools(ScriptedClient(RouteDecision=decision("agent", ("ORCL",))), [assistant(tool_calls=[call]), assistant("done")])
+    state = go(make_deps(client, retrieve=counting_retrieve([passage(1)])), "What are Oracle's main risks?")
+    assert state["memo"].answer == ai.IDK_MESSAGE
+    assert "No SEC filings are available for ORCL" in render_memo(state["memo"])

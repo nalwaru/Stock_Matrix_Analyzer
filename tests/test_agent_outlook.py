@@ -93,3 +93,43 @@ def test_synthesize_agent_route_with_no_evidence_is_idk():
 def test_agent_route_notes_empty_filing_search():
     out = run(memo(), outlook=False, graded=[], searched_filings=True)
     assert any("No relevant SEC filing passages" in u for u in out.unverified)
+
+
+PORTFOLIO = "PORTFOLIO calc, 2026-10-18, holding_AAPL"
+
+
+def test_outlook_cannot_rest_on_portfolio_or_filing_labels():
+    facts = [Fact(PORTFOLIO, "AAPL is down 12.0%"), Fact(PE, "AAPL fundamental analysis is unavailable")]
+    reasons = [f"Your position is down 12.0% [{PORTFOLIO}]", f"Supply pressure [{LABEL}]"]
+    out = run(memo(outlook=reasons, leaning="cautious"), facts=facts)
+    assert out.outlook == [] and out.outlook_leaning == ""
+    assert any("insufficient" in u.lower() for u in out.unverified)
+
+
+def test_outlook_drops_reason_with_an_unsupplied_citation_in_the_middle():
+    bad = f"Services will grow [AAPL 10-K, 2024-01-01, Item 7], supported by [{PE}]"
+    out = run(memo(outlook=[bad, f"P/E is 30.0 [{PE}]"], leaning="neutral"))
+    assert out.outlook == [f"P/E is 30.0 [{PE}]"]
+
+
+def test_cited_reasons_requires_every_bracket_to_be_supplied():
+    assert cited_reasons([f"a [{PE}] b [{RSI}]", f"a [{PE}] b [nope]"], {PE, RSI}) == [f"a [{PE}] b [{RSI}]"]
+
+
+def test_idk_memo_names_tickers_without_filings():
+    bare = {"question": "q", "portfolio_json": "{}", "history": [], "graded": [], "facts": [], "quotes": {},
+            "no_filings": ["ORCL"], "searched_filings": True,
+            "route": RouteDecision(route="agent", tickers=["ORCL"], reason="r")}
+    out = synthesize_node(bare, make_deps(ScriptedClient()))["memo"]
+    assert out.answer == ai.IDK_MESSAGE and out.no_filings == ["ORCL"]
+    assert "No SEC filings are available for ORCL" in render_memo(out)
+
+
+def test_memo_with_evidence_lists_tickers_without_filings():
+    out = run(memo(), outlook=False, no_filings=["ORCL"])
+    assert any("No SEC filings are available for ORCL" in u for u in out.unverified)
+
+
+def test_agent_stopped_early_is_flagged():
+    out = run(memo(), outlook=False, agent_stopped_early=True)
+    assert any("stopped early" in u for u in out.unverified)

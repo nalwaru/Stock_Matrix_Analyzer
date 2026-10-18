@@ -42,6 +42,7 @@ def test_search_filings_unindexed_ticker_returns_note():
     deps = make_deps(ScriptedClient(), retrieve=lambda q, t: [passage(1)])
     out = run_tool("search_filings", {"query": "q", "tickers": ["ORCL"]}, STATE, deps)
     assert out["graded"] == [] and "no filings are available for ORCL" in out["observation"]
+    assert out["no_filings"] == ["ORCL"]
 
 
 def test_portfolio_calc_runs_calculator():

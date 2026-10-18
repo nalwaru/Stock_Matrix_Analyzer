@@ -1,7 +1,7 @@
 """Graph nodes. Each takes (state, deps) and returns a partial state update."""
 from agent.deps import Deps
 from agent.llm import ask_structured
-from agent.memo import (cited_reasons, check_numbers, idk_memo, labels_for, passage_label, portfolio_label,
+from agent.memo import (analyst_labels, cited_reasons, check_numbers, idk_memo, labels_for, passage_label, portfolio_label,
                         quote_label)
 from agent.schemas import GradeResult, Memo, RewriteResult, RouteDecision, ToolPlan
 from agent.state import AgentState, Fact
@@ -326,7 +326,10 @@ def _evidence_block(state: AgentState) -> str:
 def _idk(state: AgentState) -> Memo:
     memo = idk_memo()
     route = state.get("route")
-    return memo.model_copy(update={"declined": route.declined_part}) if route is not None else memo
+    update = {"no_filings": list(state.get("no_filings", []))}
+    if route is not None:
+        update["declined"] = route.declined_part
+    return memo.model_copy(update=update)
 
 
 def synthesize_node(state: AgentState, deps: Deps) -> dict:
@@ -356,7 +359,8 @@ def synthesize_node(state: AgentState, deps: Deps) -> dict:
 
     labels = labels_for(state)
     decision = state["route"]
-    outlook = cited_reasons(list(memo.outlook), labels) if decision.wants_outlook else []
+    usable = analyst_labels(state.get("facts", []))
+    outlook = cited_reasons(list(memo.outlook), usable) if decision.wants_outlook else []
     texts = [memo.answer, *memo.key_figures, *memo.sources, *memo.unverified]
     if memo.answer.strip() == ai.IDK_MESSAGE or any(ai.grounded(t, labels) == ai.IDK_MESSAGE for t in texts):
         return {"memo": _idk(state), "trace": ["Synthesizer: unsupported citation or no answer, so \"I don't know\""]}
@@ -370,18 +374,19 @@ def synthesize_node(state: AgentState, deps: Deps) -> dict:
     unverified += [f"Live price for {t} was unavailable" for t, q in quotes.items() if q.price is None]
     if route == "agent" and state.get("searched_filings") and not graded:
         unverified.append("No relevant SEC filing passages were found")
-    facts = state.get("facts", [])
-    thin = bool(facts) and all("unavailable" in f.text for f in facts)
-    leaning = memo.outlook_leaning if outlook and not thin else ""
+    leaning = memo.outlook_leaning if outlook else ""
     if decision.wants_outlook and not leaning:
         outlook = []
         unverified.append("The analyst data was insufficient to give an outlook")
+    unverified += [f"No SEC filings are available for {t}" for t in state.get("no_filings", [])]
+    if state.get("agent_stopped_early"):
+        unverified.append("The agent stopped early because a model call failed, so evidence may be incomplete")
     if state.get("step_limit_hit"):
         unverified.append("The agent stopped at its step limit, so evidence may be incomplete")
     return {
         "memo": Memo(answer=memo.answer, key_figures=memo.key_figures, sources=memo.sources,
                      unverified=unverified, outlook=outlook, outlook_leaning=leaning,
-                     declined=decision.declined_part),
+                     declined=decision.declined_part, no_filings=list(state.get("no_filings", []))),
         "trace": ["Synthesizer: memo written from supplied evidence"],
     }
 

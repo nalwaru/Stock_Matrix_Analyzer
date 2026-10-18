@@ -64,8 +64,8 @@ def _search_filings(args: SearchFilingsArgs, state: AgentState, deps: Deps) -> d
     trace = []
     if not indexed:
         text = "; ".join(notes) or "no filings are available for these tickers"
-        return {"graded": [], "searched_filings": True, "trace": [f"search_filings: {text}"],
-                "observation": f"No passages: {text}."}
+        return {"graded": [], "searched_filings": True, "no_filings": dropped,
+                "trace": [f"search_filings: {text}"], "observation": f"No passages: {text}."}
     work = {"question": state["question"], "query": args.query, "rewrites": 0,
             "route": RouteDecision(route="agent", tickers=indexed, reason="tool")}
     graded: list = []
@@ -83,7 +83,8 @@ def _search_filings(args: SearchFilingsArgs, state: AgentState, deps: Deps) -> d
     observation = body or "No relevant passages were found."
     if notes:
         observation += "\n(" + "; ".join(notes) + ")"
-    return {"graded": graded, "searched_filings": True, "trace": trace, "observation": observation}
+    return {"graded": graded, "searched_filings": True, "no_filings": dropped, "trace": trace,
+            "observation": observation}
 
 
 def _portfolio_calc(args: CalcCall, state: AgentState, deps: Deps) -> dict:

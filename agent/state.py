@@ -32,6 +32,8 @@ class AgentState(TypedDict, total=False):
     tickers: list[str]  # resolved by the gate; the agent's default scope
     step_limit_hit: bool
     searched_filings: bool
+    no_filings: list[str]  # tickers the agent asked about that have no indexed filings
+    agent_stopped_early: bool
     quotes: dict[str, Quote]
     memo: object  # schemas.Memo
     facts: Annotated[list[Fact], operator.add]  # tool results; nodes append

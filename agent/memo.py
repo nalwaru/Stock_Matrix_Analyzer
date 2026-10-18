@@ -30,24 +30,33 @@ def labels_for(state) -> set[str]:
     return labels
 
 
-_LAST_BRACKET = re.compile(r"\[([^\[\]]+)\]\W*$")
+_BRACKET = re.compile(r"\[([^\[\]]+)\]")
+_ENDS_WITH_BRACKET = re.compile(r"\]\W*$")
+_ANALYST_LABEL = re.compile(r"^\S+ (technical|fundamental|risk|ownership), ")
 OUTLOOK_TITLE = "Outlook (Estimate based on the data above, not a filing fact and not financial advice)"
 
 
+def analyst_labels(facts) -> set[str]:
+    """Labels of analyst facts that actually carry data (not 'unavailable')."""
+    return {f.label for f in facts if _ANALYST_LABEL.match(f.label) and "unavailable" not in f.text}
+
+
 def cited_reasons(reasons: list[str], labels: set[str]) -> list[str]:
-    """Keep only reasons that end with a bracketed label that was actually supplied."""
+    """Keep reasons whose every bracketed label was supplied and that end with one."""
     kept = []
     for reason in reasons:
-        m = _LAST_BRACKET.search(reason)
-        if m and m.group(1) in labels:
+        found = _BRACKET.findall(reason)
+        if found and _ENDS_WITH_BRACKET.search(reason) and all(label in labels for label in found):
             kept.append(reason)
     return kept
 
 
 def render_memo(memo: Memo) -> str:
     declined = f"_Not answered: {memo.declined}_" if memo.declined else ""
+    no_filings = (f"_No SEC filings are available for {', '.join(memo.no_filings)}._"
+                  if memo.no_filings else "")
     if memo.answer == ai.IDK_MESSAGE:
-        return "\n\n".join(p for p in (ai.IDK_MESSAGE, declined) if p)
+        return "\n\n".join(p for p in (ai.IDK_MESSAGE, no_filings, declined) if p)
 
     def section(title: str, items: list[str]) -> str:
         body = "\n".join(f"- {i}" for i in items) if items else "- None"
@@ -63,6 +72,8 @@ def render_memo(memo: Memo) -> str:
         leaning = f"Leaning: {memo.outlook_leaning}\n" if memo.outlook_leaning else ""
         body = "\n".join(f"- {r}" for r in memo.outlook)
         parts.insert(3, f"### {OUTLOOK_TITLE}\n{leaning}{body}")
+    if no_filings:
+        parts.append(no_filings)
     if declined:
         parts.append(declined)
     return "\n\n".join(parts)
