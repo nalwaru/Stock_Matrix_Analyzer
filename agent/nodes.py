@@ -1,9 +1,12 @@
 """Graph nodes. Each takes (state, deps) and returns a partial state update."""
+from pathlib import Path
+
 from agent.deps import Deps
 from agent.llm import ask_structured
 from agent.memo import check_numbers, idk_memo, labels_for, passage_label, quote_label
 from agent.schemas import GradeResult, Memo, RewriteResult, RouteDecision, ToolPlan
 from agent.state import AgentState
+from agent.tools import filings as filing_tools
 from agent.tools.portfolio import run_calc
 from analyzer import ai
 from rag.retrieve import RetrievalError
@@ -165,7 +168,11 @@ PLANNER_PROMPT = (
     "weight; class_weight(asset_class) for an asset class's share of the portfolio; "
     "top_n(metric, n) for the biggest holdings by Current_Value, Gain_Loss, Gain_Loss_Pct "
     "or Day_Change; total() for portfolio totals; stress(asset_class, shock_pct) for a "
-    "what-if move of an asset class in percent (for example -20)."
+    "what-if move of an asset class in percent (for example -20).\n"
+    "Filing tools (filing_calls), over SEC filings stored locally: get_section(ticker, form, "
+    "section like 'Item 7') returns a whole filing section; compare_periods(ticker, "
+    "row_label like 'Total net sales') returns that table row from the latest filings, "
+    "for comparing periods; list_filings(ticker) lists available filings."
 )
 
 
@@ -176,13 +183,17 @@ def _today() -> str:
 
 
 def tools_node(state: AgentState, deps: Deps) -> dict:
-    route = state["route"].route
-    use_calc = route == "portfolio_only" and deps.holdings is not None
-    if not use_calc:
+    route = state["route"]
+    use_calc = route.route == "portfolio_only" and deps.holdings is not None
+    use_filing = (route.route in FILING_ROUTES and deps.filings_dir is not None
+                  and Path(deps.filings_dir).is_dir())
+    if not (use_calc or use_filing):
         return {"trace": []}
-    df = deps.holdings
-    menu = (f"Tickers: {', '.join(df['Ticker'])}\n"
-            f"Asset classes: {', '.join(sorted(set(df['Asset_Class'])))}")
+    if use_calc:
+        menu = (f"Tickers: {', '.join(deps.holdings['Ticker'])}\n"
+                f"Asset classes: {', '.join(sorted(set(deps.holdings['Asset_Class'])))}")
+    else:
+        menu = f"Tickers with local filings: {', '.join(route.tickers)}"
     messages = [
         {"role": "system", "content": PLANNER_PROMPT},
         {"role": "user", "content": f"{menu}\n\nQuestion: {state['question']}"},
@@ -191,16 +202,27 @@ def tools_node(state: AgentState, deps: Deps) -> dict:
         plan = ask_structured(messages, ToolPlan, deps.model, deps.client)
     except ai.AIError as exc:
         return {"trace": [f"Tool planner failed ({exc}); continuing without tools"]}
+    today = _today()
+    calls = [("calc", c) for c in plan.calc_calls] if use_calc else []
+    calls += [("filing", c) for c in plan.filing_calls] if use_filing else []
     facts, skipped = [], 0
-    for call in plan.calc_calls[:MAX_TOOL_CALLS]:
-        fact = run_calc(df, call, _today())
-        if fact is None:
-            skipped += 1
+    for kind, call in calls[:MAX_TOOL_CALLS]:
+        if kind == "calc":
+            found = [run_calc(deps.holdings, call, today)]
+        elif call.tool == "get_section":
+            found = [filing_tools.get_section(call.ticker, call.form or "10-K", call.section or "", deps.filings_dir)]
+        elif call.tool == "compare_periods" and call.row_label:
+            found = filing_tools.compare_periods(call.ticker, call.row_label, deps.filings_dir)
+        elif call.tool == "list_filings":
+            found = [filing_tools.list_filings(call.ticker, deps.filings_dir, today)]
         else:
-            facts.append(fact)
-    line = f"Tools: ran {len(facts)} portfolio calculations"
+            found = []
+        found = [f for f in found if f is not None]
+        facts += found
+        skipped += 0 if found else 1
+    line = f"Tools: ran {len(calls[:MAX_TOOL_CALLS]) - skipped} lookups -> {len(facts)} facts"
     if skipped:
-        line += f"; skipped {skipped} (unknown ticker, class or missing arguments)"
+        line += f"; skipped {skipped} (unknown ticker, section, class or missing arguments)"
     return {"facts": facts, "trace": [line]}
 
 
