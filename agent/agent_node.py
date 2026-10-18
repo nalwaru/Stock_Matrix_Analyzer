@@ -116,6 +116,8 @@ def agent_node(state: AgentState, deps: Deps) -> dict:
                     acc["trace"].append(line)
                     _step(deps, line)
                     _merge(acc, update)
+                    if update["observation"].startswith("Tool error:"):
+                        ran -= 1  # a rejected call does not use up the budget
                     analysts_ran = analysts_ran or (name == "run_analysts" and bool(update.get("facts")))
                     content = update["observation"]
             messages.append({"role": "tool", "tool_call_id": call.id, "content": content})

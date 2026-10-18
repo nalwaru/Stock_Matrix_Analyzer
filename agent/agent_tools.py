@@ -131,8 +131,9 @@ def run_tool(name: str, args: dict, state: AgentState, deps: Deps) -> dict:
     model, handler = _TOOLS[name]
     try:
         parsed = model.model_validate(args)
-    except ValidationError:
-        return _error(f"invalid arguments for {name}")
+    except ValidationError as exc:
+        detail = "; ".join(f"{'.'.join(str(p) for p in e['loc'])}: {e['msg']}" for e in exc.errors())
+        return _error(f"invalid arguments for {name} ({detail})")
     try:
         return handler(parsed, state, deps)
     except Exception as exc:  # noqa: BLE001 - a tool must never break the loop

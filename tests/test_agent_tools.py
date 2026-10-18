@@ -74,3 +74,9 @@ def test_unknown_tool_and_bad_args_are_tool_errors():
     assert run_tool("nope", {}, STATE, deps)["observation"].startswith("Tool error:")
     assert run_tool("portfolio_calc", {"tool": "bogus"}, STATE, deps)["observation"].startswith("Tool error:")
     assert run_tool("search_filings", {}, STATE, deps)["observation"].startswith("Tool error:")
+
+
+def test_invalid_argument_error_names_the_allowed_values():
+    out = run_tool("run_analysts", {"ticker": "AAPL", "kinds": ["growth"]}, STATE, make_deps())
+    text = out["observation"]
+    assert text.startswith("Tool error:") and "technical" in text and "ownership" in text

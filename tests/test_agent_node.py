@@ -151,3 +151,12 @@ def test_agent_node_reports_unindexed_tickers_and_early_stop():
     assert out["no_filings"] == ["ORCL"] and out["agent_stopped_early"] is True
     client, deps = deps_with([assistant("done")])
     assert agent_node(state(), deps)["agent_stopped_early"] is False
+
+
+def test_invalid_tool_calls_do_not_use_up_the_tool_call_cap():
+    bad = tool_call("bad", "run_analysts", {"ticker": "AAPL", "kinds": ["growth"]})
+    good = [tool_call(f"c{i}", "portfolio_calc", {"tool": "holding", "ticker": f"T{i}"})
+            for i in range(MAX_AGENT_TOOL_CALLS)]
+    client, deps = deps_with([assistant(tool_calls=[bad, *good]), assistant("done")])
+    out = agent_node(state(), deps)
+    assert out["step_limit_hit"] is False
