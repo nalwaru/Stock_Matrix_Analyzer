@@ -35,8 +35,8 @@ class FakeData:
 
 
 def state(analyses=(), tickers=("NVDA",), held=("AAPL", "NVDA")):
-    route = RouteDecision(route="analysis", tickers=list(tickers), reason="r", analyses=list(analyses))
-    return {"question": "q", "route": route, "held_tickers": list(held)}
+    route = RouteDecision(route="agent", tickers=list(tickers), reason="r")
+    return {"question": "q", "route": route, "held_tickers": list(held), "analyses": list(analyses)}
 
 
 def kinds(out):
@@ -84,9 +84,12 @@ def test_graph_analysis_route_reaches_synthesizer_with_citable_facts():
     from datetime import datetime, timezone
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     label = f"NVDA technical, {today}, RSI14"
-    client = ScriptedClient(
-        RouteDecision=RouteDecision(route="analysis", tickers=["NVDA"], reason="r", analyses=["technical"]),
-        Memo=Memo(answer=f"RSI is at an extreme [{label}].", key_figures=[], sources=[label], unverified=[]))
+    from tests.agent_fakes import assistant, tool_call, with_tools
+    analysts = tool_call("c1", "run_analysts", {"ticker": "NVDA", "kinds": ["technical"]})
+    client = with_tools(ScriptedClient(
+        RouteDecision=RouteDecision(route="agent", tickers=["NVDA"], reason="r"),
+        Memo=Memo(answer=f"RSI is at an extreme [{label}].", key_figures=[], sources=[label], unverified=[])),
+        [assistant(tool_calls=[analysts]), assistant("done")])
     state_out = run("Is NVDA overbought?", [], "{}", ["NVDA"], make_deps(client, analyst_data=FakeData()))
     assert state_out["memo"].answer.startswith("RSI is at an extreme")
 
@@ -124,7 +127,11 @@ def test_stream_collects_charts_from_the_analysis_node():
     from agent.schemas import Memo, RouteDecision
     from tests.agent_fakes import ScriptedClient
 
-    d = RouteDecision(route="analysis", tickers=["NVDA"], reason="r", analyses=["technical"])
-    client = ScriptedClient(RouteDecision=d, Memo=Memo(answer="ok", key_figures=[], sources=[], unverified=[]))
+    from tests.agent_fakes import assistant, tool_call, with_tools
+    d = RouteDecision(route="agent", tickers=["NVDA"], reason="r")
+    analysts = tool_call("c1", "run_analysts", {"ticker": "NVDA", "kinds": ["technical"]})
+    client = with_tools(
+        ScriptedClient(RouteDecision=d, Memo=Memo(answer="ok", key_figures=[], sources=[], unverified=[])),
+        [assistant(tool_calls=[analysts]), assistant("done")])
     final = list(run_stream("q", [], "{}", ["NVDA"], make_deps(client, analyst_data=FakeData())))[-1][1]
     assert len(final["charts"]) == 1

@@ -19,7 +19,7 @@ def memo(answer, figures=(), sources=(), unverified=()):
     return Memo(answer=answer, key_figures=list(figures), sources=list(sources), unverified=list(unverified))
 
 
-def state(route_name="sec_filings", graded=(), quotes=None):
+def state(route_name="agent", graded=(), quotes=None):
     return {"question": "q", "portfolio_json": "{}", "route": route(route_name),
             "graded": list(graded), "quotes": quotes or {}, "history": []}
 
@@ -45,7 +45,7 @@ def test_labels_cover_graded_passages_and_priced_quotes_only():
 
 def test_synthesize_without_evidence_returns_idk_without_model_call():
     client = ScriptedClient()
-    out = synthesize_node(state("sec_filings", graded=[]), make_deps(client))
+    out = synthesize_node(state("agent", graded=[]), make_deps(client))
     assert out["memo"].answer == ai.IDK_MESSAGE and client.calls == []
     out = synthesize_node(state("live_price", quotes={"AAPL": Quote("AAPL", None, "t")}), make_deps(client))
     assert out["memo"].answer == ai.IDK_MESSAGE and client.calls == []
@@ -62,7 +62,7 @@ def test_synthesize_keeps_supported_memo_and_adds_missing_price_note():
     good = memo(f"Risk exists [{LABEL}].", [], [LABEL], [])
     client = ScriptedClient(Memo=good)
     quotes = {"AAPL": QUOTE, "NVDA": Quote("NVDA", None, "t")}
-    out = synthesize_node(state("both", graded=[passage(1)], quotes=quotes), make_deps(client))
+    out = synthesize_node(state("agent", graded=[passage(1)], quotes=quotes), make_deps(client))
     assert out["memo"].answer == good.answer
     assert any("NVDA" in u for u in out["memo"].unverified)
 
@@ -88,7 +88,7 @@ def test_evidence_tells_the_writer_which_tickers_the_question_resolved_to():
     from agent.nodes import SYNTH_PROMPT, _evidence_block
 
     s = {"question": "technical analysis orcale", "portfolio_json": "{}", "graded": [], "quotes": {},
-         "facts": [], "route": RouteDecision(route="analysis", tickers=["ORCL"], reason="r")}
+         "facts": [], "route": RouteDecision(route="agent", tickers=["ORCL"], reason="r")}
     block = _evidence_block(s)
     assert "ORCL" in block and "resolved" in block.lower()
     assert "misspell" in SYNTH_PROMPT.lower() or "company name" in SYNTH_PROMPT.lower()

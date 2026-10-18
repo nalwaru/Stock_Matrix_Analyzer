@@ -66,7 +66,7 @@ def test_missing_api_key_raises_aierror(monkeypatch):
 
 
 def test_schemas_validate_routes_and_fields():
-    assert RouteDecision(route="both", tickers=["AAPL"], reason="r").route == "both"
+    assert RouteDecision(route="agent", tickers=["AAPL"], reason="r").route == "agent"
     with pytest.raises(Exception):
         RouteDecision(route="nonsense", tickers=[], reason="r")
     assert GradeResult(grades=[PassageGrade(id="a", relevant=True, reason="r")]).grades[0].relevant

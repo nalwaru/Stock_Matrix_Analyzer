@@ -62,3 +62,11 @@ class ScriptedToolClient:
         if isinstance(turn, Exception):
             raise turn
         return NS(choices=[NS(message=turn)])
+
+
+def with_tools(client, turns):
+    """Give a ScriptedClient a create() that serves scripted tool-calling turns."""
+    tool_client = ScriptedToolClient(turns)
+    client.chat.completions.create = tool_client._create
+    client.tool_client = tool_client
+    return client

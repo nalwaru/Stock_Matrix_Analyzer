@@ -3,7 +3,7 @@ from typing import Literal
 
 from pydantic import BaseModel
 
-Route = Literal["sec_filings", "live_price", "both", "portfolio_only", "analysis", "agent", "out_of_scope"]
+Route = Literal["live_price", "portfolio_only", "agent", "out_of_scope"]
 Analysis = Literal["technical", "fundamental", "risk", "ownership"]
 
 
@@ -11,7 +11,6 @@ class RouteDecision(BaseModel):
     route: Route
     tickers: list[str]
     reason: str
-    analyses: list[Analysis] = []
     wants_outlook: bool = False
     declined_part: str = ""
 

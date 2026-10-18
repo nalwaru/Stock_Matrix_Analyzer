@@ -1,16 +1,16 @@
 from agent.eval.run_router_eval import CASES_PATH, load_cases, route_accuracy
 
-ROUTES = {"sec_filings", "live_price", "both", "portfolio_only", "analysis", "out_of_scope"}
+ROUTES = {"live_price", "portfolio_only", "agent", "out_of_scope"}
 
 
 def test_route_accuracy_counts_hits_and_lists_misses():
-    cases = [{"question": "a", "expected_route": "both"}, {"question": "b", "expected_route": "live_price"}]
-    out = route_accuracy(cases, lambda q: "both")
-    assert out["accuracy"] == 0.5 and out["misses"] == [("b", "live_price", "both")]
+    cases = [{"question": "a", "expected_route": "agent"}, {"question": "b", "expected_route": "live_price"}]
+    out = route_accuracy(cases, lambda q: "agent")
+    assert out["accuracy"] == 0.5 and out["misses"] == [("b", "live_price", "agent")]
 
 
 def test_empty_cases_do_not_divide_by_zero():
-    assert route_accuracy([], lambda q: "both")["accuracy"] == 0.0
+    assert route_accuracy([], lambda q: "agent")["accuracy"] == 0.0
 
 
 def test_every_route_has_at_least_two_cases():

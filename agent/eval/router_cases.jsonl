@@ -1,31 +1,35 @@
-{"question": "What are the main risk factors Apple discloses?", "expected_route": "sec_filings"}
-{"question": "How much were Apple's iPhone net sales in fiscal 2025?", "expected_route": "sec_filings"}
-{"question": "What did Apple's latest 10-Q say about share repurchases?", "expected_route": "sec_filings"}
+{"question": "What are the main risk factors Apple discloses?", "expected_route": "agent"}
+{"question": "How much were Apple's iPhone net sales in fiscal 2025?", "expected_route": "agent"}
+{"question": "What did Apple's latest 10-Q say about share repurchases?", "expected_route": "agent"}
 {"question": "What is AAPL trading at today?", "expected_route": "live_price"}
 {"question": "Is NVDA up or down today?", "expected_route": "live_price"}
-{"question": "Show Apple's price right now and what its latest 10-Q says about revenue.", "expected_route": "both"}
-{"question": "What is Apple's current share price, and which risks does its 10-K highlight?", "expected_route": "both"}
+{"question": "Show Apple's price right now and what its latest 10-Q says about revenue.", "expected_route": "agent"}
+{"question": "What is Apple's current share price, and which risks does its 10-K highlight?", "expected_route": "agent"}
 {"question": "Which of my holdings has the biggest gain?", "expected_route": "portfolio_only"}
 {"question": "What percentage of my portfolio is in crypto?", "expected_route": "portfolio_only"}
 {"question": "How many positions do I hold?", "expected_route": "portfolio_only"}
 {"question": "Should I buy more Apple?", "expected_route": "out_of_scope"}
 {"question": "What will Apple's stock be worth next year?", "expected_route": "out_of_scope"}
-{"question": "What do analysts think of Apple?", "expected_route": "analysis"}
+{"question": "What do analysts think of Apple?", "expected_route": "agent"}
 {"question": "Tell me a joke.", "expected_route": "out_of_scope"}
-{"question": "How is Apple exposed to China manufacturing?", "expected_route": "sec_filings"}
-{"question": "What does Apple say about depending on outsourcing partners?", "expected_route": "sec_filings"}
-{"question": "Why did Apple's net sales grow in fiscal 2025?", "expected_route": "sec_filings"}
+{"question": "How is Apple exposed to China manufacturing?", "expected_route": "agent"}
+{"question": "What does Apple say about depending on outsourcing partners?", "expected_route": "agent"}
+{"question": "Why did Apple's net sales grow in fiscal 2025?", "expected_route": "agent"}
 {"question": "Will Apple beat earnings next quarter?", "expected_route": "out_of_scope"}
-{"question": "Is NVDA overbought right now?", "expected_route": "analysis"}
-{"question": "What is Apple's valuation compared with analyst price targets?", "expected_route": "analysis"}
-{"question": "How volatile is RIVN compared with the market?", "expected_route": "analysis"}
-{"question": "Give me a full analysis of NVDA.", "expected_route": "analysis"}
+{"question": "Is NVDA overbought right now?", "expected_route": "agent"}
+{"question": "What is Apple's valuation compared with analyst price targets?", "expected_route": "agent"}
+{"question": "How volatile is RIVN compared with the market?", "expected_route": "agent"}
+{"question": "Give me a full analysis of NVDA.", "expected_route": "agent"}
 {"question": "What happens to my portfolio if crypto falls 30%?", "expected_route": "portfolio_only"}
-{"question": "technical analysis orcale", "expected_route": "analysis", "expected_tickers": ["ORCL"]}
-{"question": "technical analysis for oracle", "expected_route": "analysis", "expected_tickers": ["ORCL"]}
-{"question": "how risky is Rivian?", "expected_route": "analysis", "expected_tickers": ["RIVN"]}
-{"question": "is Nvidia overbought?", "expected_route": "analysis", "expected_tickers": ["NVDA"]}
+{"question": "technical analysis orcale", "expected_route": "agent", "expected_tickers": ["ORCL"]}
+{"question": "technical analysis for oracle", "expected_route": "agent", "expected_tickers": ["ORCL"]}
+{"question": "how risky is Rivian?", "expected_route": "agent", "expected_tickers": ["RIVN"]}
+{"question": "is Nvidia overbought?", "expected_route": "agent", "expected_tickers": ["NVDA"]}
 {"question": "What if tech stocks drop 20%?", "expected_route": "portfolio_only"}
 {"question": "How much would I lose if my equities fell 15%?", "expected_route": "portfolio_only"}
 {"question": "Stress test my portfolio with a 10% market drop", "expected_route": "portfolio_only"}
 {"question": "If bonds rally 5%, what is my total value?", "expected_route": "portfolio_only"}
+{"question": "What is Apple's profit? Do you expect growth next year?", "expected_route": "agent", "expected_wants_outlook": true}
+{"question": "Should I buy Tesla, and what is their revenue?", "expected_route": "agent", "expected_declined": true}
+{"question": "Will AAPL hit 300 by December?", "expected_route": "out_of_scope"}
+{"question": "How is my Apple position exposed to the risks in its 10-K?", "expected_route": "agent"}

@@ -33,6 +33,12 @@ def ticker_misses(cases: list[dict], decide_tickers: Callable[[str], list[str]])
     return misses
 
 
+def flag_misses(cases: list[dict], key: str, decide_flag: Callable[[str], bool]) -> list[tuple]:
+    """Cases that pin a boolean `key` (expected_wants_outlook / expected_declined) the router got wrong."""
+    return [(c["question"], c[key], decide_flag(c["question"])) for c in cases
+            if key in c and decide_flag(c["question"]) != c[key]]
+
+
 def main() -> int:
     load_dotenv()
     from agent.nodes import router_node
@@ -52,6 +58,10 @@ def main() -> int:
         print(f"  MISS {question!r}: expected {expected}, got {got}")
     for question, want, got in ticker_misses(load_cases(), lambda q: full(q).tickers):
         print(f"  TICKER MISS {question!r}: expected {want}, got {got}")
+    for key, getter in (("expected_wants_outlook", lambda q: full(q).wants_outlook),
+                        ("expected_declined", lambda q: bool(full(q).declined_part))):
+        for question, want, got in flag_misses(load_cases(), key, getter):
+            print(f"  {key.upper()} MISS {question!r}: expected {want}, got {got}")
     return 0
 
 

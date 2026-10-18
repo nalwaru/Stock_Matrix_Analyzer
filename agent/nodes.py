@@ -17,43 +17,40 @@ from analyzer import ai
 from rag.retrieve import RetrievalError
 
 ROUTER_PROMPT = (
-    "You route a question about the user's investment portfolio to the right helper. "
-    "Choose exactly one route:\n"
-    "- sec_filings: needs facts from company SEC filings (10-K, 10-Q, 8-K): results, risks, "
-    "business, legal, why something happened.\n"
-    "- live_price: needs the current stock price or today's move.\n"
-    "- both: needs filings and the current price.\n"
-    "- portfolio_only: answerable from the user's own holdings data (values, weights, gains, "
-    "what-if shocks).\n"
-    "- analysis: asks for a technical, fundamental, risk or analyst/ownership analysis of a "
-    "ticker (trend, RSI, moving averages, valuation ratios, margins, volatility, beta, "
-    "drawdown, analyst targets, insider or institutional holders, earnings date). Questions like "
-    "'how risky is X', 'is X overbought', 'is X expensive' and 'what do analysts think of X' are "
-    "analysis: the analysts answer them from data. Also fill "
-    "`analyses` with ONLY the kinds the question needs and never leave it empty: "
-    "overbought/oversold/trend/RSI/moving averages -> technical; valuation/P-E/margins/growth/"
-    "debt -> fundamental; volatility/beta/drawdown/'how risky' -> risk; analyst targets/ratings/"
-    "insiders/institutions/earnings date -> ownership; 'valuation vs analyst targets' -> "
-    "fundamental and ownership; 'full analysis' -> all four.\n"
-    "- out_of_scope: ONLY requests for advice or recommendations (for example 'should I "
-    "buy X?'), predictions of future prices or results, other people's opinions (analyst "
-    "views, market sentiment), or topics unrelated to investing. Questions about what a "
-    "company discloses, how it is exposed to a risk, or what drove its reported results are "
-    "sec_filings, never out_of_scope.\n"
+    "You are the front door for questions about the user's investment portfolio. Choose "
+    "exactly one route:\n"
+    "- live_price: ONLY the current stock price or today's move of named or held stocks.\n"
+    "- portfolio_only: answerable from the user's own holdings data alone (values, weights, "
+    "gains, losses, what-if shocks such as 'what happens if crypto falls 30%').\n"
+    "- agent: anything else that is in scope and needs evidence: facts from company SEC "
+    "filings (results, profit, revenue, risks, business, legal, why something happened), "
+    "technical, fundamental, risk or analyst/ownership checks (trend, RSI, valuation, margins, "
+    "volatility, beta, analyst targets, insiders), questions that combine several of these or "
+    "mix the company with the user's holdings, and questions about a company's business "
+    "outlook or growth.\n"
+    "- out_of_scope: ONLY when nothing in the question is in scope: requests for advice or "
+    "recommendations ('should I buy X?'), predictions of a stock's future price or of specific future results ('will X hit "
+    "300?', 'will X beat earnings next quarter?'), other people's opinions or market sentiment, or topics unrelated to investing. "
+    "Questions about what a company discloses or what drove its results are agent, never "
+    "out_of_scope.\n"
+    "Set wants_outlook true whenever ANY part of the question asks about a company's future "
+    "business or growth (for example 'do you expect growth next year?', 'what is the outlook "
+    "for Apple?'), even if another part asks for a past fact such as profit; otherwise false.\n"
+    "If a question has an in-scope part and an out-of-scope part (for example 'Should I buy "
+    "Tesla, and what is their revenue?'), choose the route for the in-scope part and put the "
+    "out-of-scope part in declined_part as a short phrase (for example 'buy advice'); "
+    "otherwise leave declined_part empty.\n"
     "List the stock tickers the question is about (empty if it is about the whole portfolio). "
     "If the question names a company, even by a misspelling or its plain name, give that "
     "company's real ticker symbol (Oracle -> ORCL, Rivian -> RIVN, Nvidia -> NVDA); it may not "
     "be a held ticker, and never substitute a held ticker that merely looks similar. "
-    "Questions about valuation, analyst targets or ratings, technical indicators or risk "
-    "metrics are `analysis` even when they mention the price. "
-    "When unsure whether a question is about company disclosures, prefer sec_filings."
+    "When unsure whether a question is about company disclosures, prefer agent."
 )
 OPENROUTER_BODY = {"provider": {"require_parameters": True}}  # only providers that honour response_format
-FILING_ROUTES = {"sec_filings", "both"}
 NEXT_NODE = {
-    "sec_filings": "retrieve", "both": "retrieve", "live_price": "price",
-    "portfolio_only": "tools", "analysis": "analysis", "out_of_scope": "refuse",
+    "live_price": "price", "portfolio_only": "tools", "agent": "agent", "out_of_scope": "refuse",
 }
+MAX_HELD_DEFAULT = 3
 
 
 def router_node(state: AgentState, deps: Deps) -> dict:
@@ -80,24 +77,21 @@ def router_node(state: AgentState, deps: Deps) -> dict:
 
     route = decision.route
     tickers = list(dict.fromkeys(t.strip().upper() for t in decision.tickers if t.strip()))
-    notes = []
-    if route in FILING_ROUTES:
-        indexed = [t for t in tickers if t in deps.indexed_tickers]
-        if not indexed and not tickers:
-            indexed = [t for t in held if t in deps.indexed_tickers]
-        if not indexed:
-            notes.append("no filings are available for these tickers")
-            route = "portfolio_only" if route == "sec_filings" else "live_price"
-        else:
-            tickers = indexed if route == "sec_filings" else list(dict.fromkeys(indexed + tickers))
-    if route in ("live_price", "analysis") and not tickers:
-        tickers = held[:3] if route == "analysis" else held
+    if not tickers:
+        if route == "live_price":
+            tickers = held
+        elif route == "agent":
+            tickers = held[:MAX_HELD_DEFAULT]
     line = f"Router: {route} ({decision.reason})"
-    if notes:
-        line += f"; {notes[0]}, so route changed from {decision.route}"
+    if decision.wants_outlook:
+        line += "; outlook requested"
+    if decision.declined_part:
+        line += f"; will not answer: {decision.declined_part}"
     return {
         "route": RouteDecision(route=route, tickers=tickers, reason=decision.reason,
-                               analyses=list(decision.analyses)),
+                               wants_outlook=decision.wants_outlook,
+                               declined_part=decision.declined_part),
+        "tickers": tickers,
         "trace": [line],
     }
 
@@ -170,12 +164,6 @@ def rewrite_node(state: AgentState, deps: Deps) -> dict:
     return {"rewrites": rewrites, "query": new, "trace": [f"Rewriter ({rewrites}/{MAX_REWRITES}): \"{new}\""]}
 
 
-def route_after_grade(state: AgentState) -> str:
-    if state.get("graded") or state.get("rewrites", 0) >= MAX_REWRITES:
-        return "price" if state["route"].route == "both" else "synthesize"
-    return "rewrite"
-
-
 MAX_TOOL_CALLS = 3
 PLANNER_PROMPT = (
     "You pick calculator tools that help answer a question about the user's portfolio, so "
@@ -231,7 +219,7 @@ def analysis_node(state: AgentState, deps: Deps) -> dict:
     route = state["route"]
     held = list(state.get("held_tickers", []))
     tickers = (route.tickers or held)[:MAX_ANALYSIS_TICKERS]
-    wanted = state.get("analyses") or route.analyses or ALL_ANALYSES
+    wanted = state.get("analyses") or ALL_ANALYSES
     today = _today()
     facts, trace, charts = [], [], []
     for ticker in tickers:
@@ -305,7 +293,6 @@ SYNTH_PROMPT = (
     "number of your own. If the evidence block names a part of the question that is not "
     "answered, do not answer that part and do not mention it in the answer."
 )
-LIVE_ROUTES = {"live_price", "both"}
 
 
 def _evidence_block(state: AgentState) -> str:
@@ -348,7 +335,7 @@ def synthesize_node(state: AgentState, deps: Deps) -> dict:
     quotes = state.get("quotes", {})
     has_price = any(q.price is not None for q in quotes.values())
     has_facts = bool(state.get("facts"))
-    if (route in FILING_ROUTES or route in LIVE_ROUTES or route in ("analysis", "agent")) and not (
+    if route in ("live_price", "agent") and not (
         graded or has_price or has_facts
     ):
         return {"memo": _idk(state), "trace": ["Synthesizer: no supporting evidence, so \"I don't know\""]}
@@ -381,7 +368,7 @@ def synthesize_node(state: AgentState, deps: Deps) -> dict:
         for n in check_numbers([memo.answer, *memo.key_figures, *outlook], evidence)
     ]
     unverified += [f"Live price for {t} was unavailable" for t, q in quotes.items() if q.price is None]
-    if (route in FILING_ROUTES or (route == "agent" and state.get("searched_filings"))) and not graded:
+    if route == "agent" and state.get("searched_filings") and not graded:
         unverified.append("No relevant SEC filing passages were found")
     facts = state.get("facts", [])
     thin = bool(facts) and all("unavailable" in f.text for f in facts)

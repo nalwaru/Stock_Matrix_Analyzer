@@ -1,13 +1,12 @@
 import openai
 
-from agent.nodes import (MAX_REWRITES, grade_node, retrieve_node, rewrite_node,
-                         route_after_grade)
+from agent.nodes import grade_node, retrieve_node, rewrite_node
 from agent.schemas import GradeResult, PassageGrade, RewriteResult, RouteDecision
 from rag.retrieve import RetrievalError
 from tests.agent_fakes import ScriptedClient, make_deps, passage
 
 
-def route(name="sec_filings", tickers=("AAPL",)):
+def route(name="agent", tickers=("AAPL",)):
     return RouteDecision(route=name, tickers=list(tickers), reason="r")
 
 
@@ -66,12 +65,3 @@ def test_rewrite_failure_keeps_old_query_but_still_counts():
     client = ScriptedClient(RewriteResult=openai.OpenAIError("x"))
     out = rewrite_node({"question": "q", "query": "old"}, make_deps(client))
     assert out["rewrites"] == 1 and out["query"] == "old"
-
-
-def test_route_after_grade_all_branches():
-    some, none = [passage(1)], []
-    assert route_after_grade({"route": route("sec_filings"), "graded": some}) == "synthesize"
-    assert route_after_grade({"route": route("both"), "graded": some}) == "price"
-    assert route_after_grade({"route": route(), "graded": none, "rewrites": 0}) == "rewrite"
-    assert route_after_grade({"route": route(), "graded": none, "rewrites": MAX_REWRITES - 1}) == "rewrite"
-    assert route_after_grade({"route": route(), "graded": none, "rewrites": MAX_REWRITES}) == "synthesize"

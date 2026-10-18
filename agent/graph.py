@@ -1,4 +1,4 @@
-"""LangGraph assembly: router -> (filings loop | price | portfolio | refusal) -> memo."""
+"""LangGraph assembly: router (gate) -> (agent | price | portfolio calculator | refusal) -> memo."""
 from collections.abc import Iterator
 from datetime import datetime, timezone
 import time
@@ -7,9 +7,8 @@ from langgraph.graph import END, START, StateGraph
 
 from agent.deps import Deps
 from agent.memo import idk_memo
-from agent.nodes import (analysis_node, grade_node, price_node, refuse_node, retrieve_node,
-                         rewrite_node, route_after_grade, route_after_router,
-                         router_node, synthesize_node, tools_node)
+from agent.agent_node import agent_node
+from agent.nodes import price_node, refuse_node, route_after_router, router_node, synthesize_node, tools_node
 from agent.state import AgentState
 
 
@@ -24,22 +23,16 @@ def _timed(name: str, node, deps: Deps):
 def build_graph(deps: Deps):
     graph = StateGraph(AgentState)
     for name, node in (
-        ("router", router_node), ("retrieve", retrieve_node), ("grade", grade_node),
-        ("rewrite", rewrite_node), ("price", price_node), ("synthesize", synthesize_node),
-        ("refuse", refuse_node), ("tools", tools_node), ("analysis", analysis_node),
+        ("router", router_node), ("price", price_node), ("tools", tools_node),
+        ("agent", agent_node), ("synthesize", synthesize_node), ("refuse", refuse_node),
     ):
         graph.add_node(name, _timed(name, node, deps))
     graph.add_edge(START, "router")
     graph.add_conditional_edges("router", route_after_router, {
-        "retrieve": "retrieve", "price": "price", "tools": "tools", "analysis": "analysis",
-        "refuse": "refuse"})
-    graph.add_edge("retrieve", "grade")
-    graph.add_conditional_edges("grade", route_after_grade, {
-        "price": "price", "synthesize": "synthesize", "rewrite": "rewrite"})
-    graph.add_edge("tools", "synthesize")
-    graph.add_edge("analysis", "synthesize")
-    graph.add_edge("rewrite", "retrieve")
+        "price": "price", "tools": "tools", "agent": "agent", "refuse": "refuse"})
     graph.add_edge("price", "synthesize")
+    graph.add_edge("tools", "synthesize")
+    graph.add_edge("agent", "synthesize")
     graph.add_edge("synthesize", END)
     graph.add_edge("refuse", END)
     return graph.compile()
@@ -62,12 +55,9 @@ def run(question: str, history: list[dict], portfolio_json: str,
 
 NODE_LABELS = {
     "router": "Working out what your question needs",
-    "retrieve": "Searching the SEC filings",
-    "grade": "Checking which passages really answer it",
-    "rewrite": "Rewording the search",
     "tools": "Running calculations",
     "price": "Fetching live prices",
-    "analysis": "Running the analyst checks",
+    "agent": "Gathering evidence with tools",
     "synthesize": "Writing the memo",
     "refuse": "Checking whether this is something I can answer",
 }

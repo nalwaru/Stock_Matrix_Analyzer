@@ -34,9 +34,9 @@ def decision(route, tickers=(), reason="r"):
 
 
 def test_router_returns_structured_decision():
-    client = FakeClient(decision("sec_filings", ["AAPL"]))
+    client = FakeClient(decision("agent", ["AAPL"]))
     out = router_node(state("What are Apple's risks?"), deps(client))
-    assert out["route"].route == "sec_filings" and out["route"].tickers == ["AAPL"]
+    assert out["route"].route == "agent" and out["route"].tickers == ["AAPL"]
     assert "Router" in out["trace"][0]
     assert "What are Apple's risks?" in client.calls[0]["messages"][1]["content"]
 
@@ -47,22 +47,14 @@ def test_router_failure_falls_back_to_portfolio_only_with_trace():
     assert "routing failed" in out["trace"][0].lower()
 
 
-def test_tickers_filtered_to_indexed_for_filings_routes():
-    out = router_node(state(), deps(FakeClient(decision("sec_filings", ["aapl", "ZZZZ"]))))
-    assert out["route"].tickers == ["AAPL"]
+def test_unindexed_ticker_stays_on_the_agent_route():
+    out = router_node(state(), deps(FakeClient(decision("agent", ["orcl"]))))
+    assert out["route"].route == "agent" and out["route"].tickers == ["ORCL"]
 
 
-def test_empty_tickers_fall_back_to_held_indexed_tickers():
-    out = router_node(state(), deps(FakeClient(decision("sec_filings", []))))
-    assert out["route"].tickers == ["AAPL"]
-
-
-def test_filings_route_without_indexed_ticker_downgrades():
-    d = deps(FakeClient(decision("sec_filings", ["NVDA"])))
-    out = router_node(state(), d)
-    assert out["route"].route == "portfolio_only" and "no filings" in out["trace"][0].lower()
-    both = router_node(state(), deps(FakeClient(decision("both", ["NVDA"]))))
-    assert both["route"].route == "live_price" and both["route"].tickers == ["NVDA"]
+def test_agent_with_no_tickers_defaults_to_held():
+    out = router_node(state(), deps(FakeClient(decision("agent", []))))
+    assert out["route"].tickers == ["AAPL", "NVDA"] and out["tickers"] == ["AAPL", "NVDA"]
 
 
 def test_live_price_with_no_tickers_uses_held():
@@ -71,17 +63,27 @@ def test_live_price_with_no_tickers_uses_held():
 
 
 def test_route_after_router_mapping():
-    expected = {"sec_filings": "retrieve", "both": "retrieve", "live_price": "price",
-                "portfolio_only": "tools", "analysis": "analysis", "out_of_scope": "refuse"}
+    expected = {"live_price": "price", "portfolio_only": "tools", "agent": "agent",
+                "out_of_scope": "refuse"}
     for route, node in expected.items():
         assert route_after_router({"route": decision(route)}) == node
 
 
-def test_analysis_route_keeps_the_analyses_the_router_chose():
-    d = RouteDecision(route="analysis", tickers=["NVDA"], reason="r", analyses=["technical"])
-    out = router_node(state(), deps(FakeClient(d)))
-    assert out["route"].route == "analysis" and out["route"].analyses == ["technical"]
-    assert out["route"].tickers == ["NVDA"]
+def test_outlook_question_sets_wants_outlook():
+    d = RouteDecision(route="agent", tickers=["AAPL"], reason="r", wants_outlook=True)
+    out = router_node(state("Do you expect growth next year?"), deps(FakeClient(d)))
+    assert out["route"].wants_outlook is True and "outlook" in out["trace"][0].lower()
+
+
+def test_partial_decline_keeps_in_scope_route_and_declined_part():
+    d = RouteDecision(route="agent", tickers=["TSLA"], reason="r", declined_part="buy advice")
+    out = router_node(state("Should I buy Tesla, and what is their revenue?"), deps(FakeClient(d)))
+    assert out["route"].route == "agent" and out["route"].declined_part == "buy advice"
+
+
+def test_all_out_of_scope_refuses():
+    out = router_node(state("Will AAPL hit 300?"), deps(FakeClient(decision("out_of_scope"))))
+    assert out["route"].route == "out_of_scope" and route_after_router(out) == "refuse"
 
 
 def test_router_uses_its_own_client_and_model_when_configured():

@@ -1,6 +1,5 @@
 from agent.memo import check_numbers, labels_for
-from agent.nodes import (route_after_grade, route_after_router,
-                         synthesize_node)
+from agent.nodes import route_after_router, synthesize_node
 from agent.schemas import Memo, RouteDecision
 from agent.state import Fact
 from analyzer import ai
@@ -45,23 +44,20 @@ def test_synthesizer_uses_facts_as_evidence_and_flags_unmatched_figures():
 
 def test_synthesizer_with_only_facts_does_not_refuse():
     memo = Memo(answer=f"See [{FACT.label}].", key_figures=[], sources=[], unverified=[])
-    state = {"question": "q", "portfolio_json": "{}", "route": route("analysis"),
+    state = {"question": "q", "portfolio_json": "{}", "route": route("agent"),
              "graded": [], "quotes": {}, "facts": [FACT], "history": []}
     assert synthesize_node(state, make_deps(ScriptedClient(Memo=memo)))["memo"].answer == memo.answer
 
 
 def test_analysis_route_without_any_evidence_is_idk():
-    state = {"question": "q", "portfolio_json": "{}", "route": route("analysis"),
+    state = {"question": "q", "portfolio_json": "{}", "route": route("agent"),
              "graded": [], "quotes": {}, "facts": [], "history": []}
     assert synthesize_node(state, make_deps(ScriptedClient()))["memo"].answer == ai.IDK_MESSAGE
 
 
 def test_routing_functions_for_tools():
     assert route_after_router({"route": route("portfolio_only")}) == "tools"
-    assert route_after_router({"route": route("analysis")}) == "analysis"
-    assert route_after_grade({"route": route("sec_filings"), "graded": [passage(1)]}) == "synthesize"
-    assert route_after_grade({"route": route("sec_filings"), "graded": [], "rewrites": 2}) == "synthesize"
-    assert route_after_grade({"route": route("sec_filings"), "graded": [], "rewrites": 0}) == "rewrite"
+    assert route_after_router({"route": route("agent")}) == "agent"
 
 
 def test_check_numbers_sees_numbers_inside_bracketed_json_evidence():
