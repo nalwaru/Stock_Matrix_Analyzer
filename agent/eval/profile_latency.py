@@ -13,6 +13,8 @@ QUESTIONS = [
     "What happens to my portfolio if crypto falls 30%?",
     "Is NVDA overbought and how risky is it?",
     "Should I buy Tesla?",
+    "What is Apple's profit? Do you expect growth next year?",
+    "Should I buy Tesla, and what is their revenue?",
 ]
 SAMPLE = Path(__file__).parents[2] / "data" / "sample_portfolio.csv"
 
@@ -41,6 +43,12 @@ def main() -> int:
         print(f"\n{question}\n  route={route}  total={total:.1f}s")
         for node, secs in state.get("timings", []):
             print(f"    {node:<11}{secs:6.2f}s")
+        for line in state.get("trace", []):
+            if line.startswith("Agent tool:"):
+                print(f"      {line}")
+        if question.startswith("What is Apple's profit"):
+            from agent.memo import render_memo
+            print("\n" + render_memo(state["memo"]))
     return 0
 
 

@@ -1,0 +1,5 @@
+{"question": "What is Apple's profit? Do you expect growth next year?", "expect_tools": ["search_filings", "run_analysts"], "expect_sections": ["outlook"], "forbid": ["guaranteed"]}
+{"question": "What are Apple's main risk factors?", "expect_tools": ["search_filings"], "expect_sections": [], "forbid": []}
+{"question": "How is my Apple position exposed to the risks in its 10-K?", "expect_tools": ["portfolio_calc", "search_filings"], "expect_sections": [], "forbid": []}
+{"question": "Should I buy Tesla, and what is their revenue?", "expect_tools": [], "expect_sections": ["declined"], "forbid": ["you should buy", "i recommend buying"]}
+{"question": "Will AAPL hit 300 by December?", "expect_tools": [], "expect_sections": ["idk"], "forbid": []}
