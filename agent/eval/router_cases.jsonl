@@ -35,3 +35,5 @@
 {"question": "How is my Apple position exposed to the risks in its 10-K?", "expected_route": "agent"}
 {"question": "tala outlook", "expected_route": "out_of_scope"}
 {"question": "What is the outlook for Zorblax Corp?", "expected_route": "out_of_scope"}
+{"question": "oracle outlook?", "expected_route": "agent", "expected_tickers": ["ORCL"], "expected_wants_outlook": true}
+{"question": "rivianll price", "expected_route": "live_price", "expected_tickers": ["RIVN"]}

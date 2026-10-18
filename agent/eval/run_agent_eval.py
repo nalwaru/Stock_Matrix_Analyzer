@@ -35,6 +35,8 @@ def score(case: dict, state: dict) -> list[str]:
     failures += [f"missing section: {s}" for s in case["expect_sections"] if not has[s]]
     text = render_memo(memo).lower()
     failures += [f"forbidden text present: {w}" for w in case["forbid"] if w.lower() in text]
+    if case.get("expect_no_chart") and state.get("charts"):
+        failures.append("chart shown but none expected")
     return failures
 
 

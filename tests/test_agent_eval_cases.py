@@ -36,6 +36,13 @@ def test_score_reports_missing_tool_missing_section_and_forbidden_text():
     assert any("you should buy" in f for f in failures)
 
 
+def test_score_flags_a_chart_when_the_case_expects_none():
+    case = {"question": "q", "expect_tools": [], "expect_sections": [], "forbid": [], "expect_no_chart": True}
+    assert score(case, {**final(plain()), "charts": []}) == []
+    failures = score(case, {**final(plain()), "charts": [object()]})
+    assert failures == ["chart shown but none expected"]
+
+
 def test_score_idk_section():
     case = {"question": "q", "expect_tools": [], "expect_sections": ["idk"], "forbid": []}
     idk = Memo(answer=ai.IDK_MESSAGE, key_figures=[], sources=[], unverified=[])
