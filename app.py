@@ -9,7 +9,7 @@ import plotly.express as px
 import streamlit as st
 from dotenv import load_dotenv
 
-from analyzer import ai, export, market, portfolio, scenarios, schema
+from analyzer import ai, export, loading, market, portfolio, scenarios, schema
 from agent import graph as agent_graph
 from agent import wiring as agent_wiring
 from agent.memo import idk_memo, markdown_safe, render_memo
@@ -255,6 +255,7 @@ def render_ask_ai(df: pd.DataFrame) -> None:
             with st.chat_message("user"):
                 st.markdown(question)
             with st.chat_message("assistant"):
+                st.markdown(loading.money_bag_html(), unsafe_allow_html=True)
                 status = st.status("Routing your question...", expanded=True)
                 try:
                     for node, update in agent_graph.run_stream(

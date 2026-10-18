@@ -65,3 +65,14 @@ def test_routing_functions_for_tools():
     assert route_after_tools({"route": route("both")}) == "price"
     assert route_after_tools({"route": route("sec_filings")}) == "synthesize"
     assert route_after_tools({"route": route("portfolio_only")}) == "synthesize"
+
+
+def test_check_numbers_sees_numbers_inside_bracketed_json_evidence():
+    evidence = '{"holdings": [{"Ticker": "SCHD", "Gain_Loss": -1526.0}], "total": 2}'
+    assert check_numbers(["SCHD lost 1,526.00"], evidence) == []
+    assert check_numbers(["loss of -1526.0"], evidence) == []
+
+
+def test_labels_for_includes_the_portfolio_data_label_when_today_is_known():
+    assert "PORTFOLIO data, 2026-10-18, holdings" in labels_for({"today": "2026-10-18"})
+    assert not any(label.startswith("PORTFOLIO data") for label in labels_for({}))

@@ -24,7 +24,7 @@ def frame():
 
 
 def call(tool, **kw):
-    base = dict(ticker=None, asset_class=None, metric=None, n=None, shock_pct=None)
+    base = dict(ticker=None, asset_class=None, metric=None, n=None, shock_pct=None, order=None)
     return CalcCall(tool=tool, **{**base, **kw})
 
 
@@ -42,6 +42,13 @@ def test_class_weight():
 def test_top_n_orders_by_metric():
     fact = run_calc(frame(), call("top_n", metric="Gain_Loss", n=2), TODAY)
     assert fact.text.index("AAPL") < fact.text.index("BTC-USD") and "NVDA" not in fact.text
+
+
+def test_top_n_smallest_returns_the_biggest_losers_first():
+    fact = run_calc(frame(), call("top_n", metric="Gain_Loss", n=2, order="smallest"), TODAY)
+    assert fact.label.endswith("bottom2_Gain_Loss")
+    assert fact.text.index("NVDA") < fact.text.index("BTC-USD") and "AAPL" not in fact.text
+    assert "-100.00" in fact.text
 
 
 def test_total_uses_portfolio_summary():
