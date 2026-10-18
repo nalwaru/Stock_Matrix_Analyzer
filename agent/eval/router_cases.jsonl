@@ -33,3 +33,5 @@
 {"question": "Should I buy Tesla, and what is their revenue?", "expected_route": "agent", "expected_declined": true}
 {"question": "Will AAPL hit 300 by December?", "expected_route": "out_of_scope"}
 {"question": "How is my Apple position exposed to the risks in its 10-K?", "expected_route": "agent"}
+{"question": "tala outlook", "expected_route": "out_of_scope"}
+{"question": "What is the outlook for Zorblax Corp?", "expected_route": "out_of_scope"}

@@ -30,7 +30,7 @@ ROUTER_PROMPT = (
     "outlook or growth.\n"
     "- out_of_scope: ONLY when nothing in the question is in scope: requests for advice or "
     "recommendations ('should I buy X?'), predictions of a stock's future price or of specific future results ('will X hit "
-    "300?', 'will X beat earnings next quarter?'), other people's opinions or market sentiment, or topics unrelated to investing. "
+    "300?', 'will X beat earnings next quarter?'), other people's opinions or market sentiment, topics unrelated to investing, or a question about a specific company you cannot map to a real public ticker (a private, fictional or unknown company; never substitute a held ticker for it). "
     "Questions about what a company discloses or what drove its results are agent, never "
     "out_of_scope.\n"
     "Set wants_outlook true whenever ANY part of the question asks about a company's future "
