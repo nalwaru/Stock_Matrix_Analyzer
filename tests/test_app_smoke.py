@@ -95,7 +95,7 @@ def test_answer_renders_memo_sources_and_agent_trace(monkeypatch):
     assert not at.exception
     labels = [e.label for e in at.expander]
     assert "Sources" in labels and "Agent trace" in labels
-    assert any("### Answer" in m.value and "Because of the 8-K" in m.value for m in at.markdown)
+    assert any("Because of the 8-K" in m.value and "###" not in m.value for m in at.markdown)
 
 
 def test_graph_receives_question_history_and_held_tickers(monkeypatch):

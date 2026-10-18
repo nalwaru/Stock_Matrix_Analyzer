@@ -52,7 +52,7 @@ _BRACKET = re.compile(r"\[([^\[\]]+)\]")
 _ENDS_WITH_BRACKET = re.compile(r"\]\W*$")
 _ANALYST_LABEL = re.compile(r"^\S+ (technical|fundamental|risk|ownership), ")
 ADVISOR_NOTE = "_I'm not a financial advisor. This is an educational estimate from the data above, not advice._"
-OUTLOOK_TITLE = "Outlook (Estimate based on the data above, not a filing fact and not financial advice)"
+OUTLOOK_TITLE = "**Outlook** (_Estimate based on the data above, not a filing fact and not financial advice_)"
 
 
 def analyst_labels(facts) -> set[str]:
@@ -74,18 +74,18 @@ def render_memo(memo: Memo) -> str:
     declined = f"_Not answered: {memo.declined}_" if memo.declined else ""
     no_filings = (f"_No SEC filings are available for {', '.join(memo.no_filings)}._"
                   if memo.no_filings else "")
-    if memo.answer == ai.IDK_MESSAGE:  # same Answer heading as every other reply
-        return "\n\n".join(p for p in (f"### Answer\n{ai.IDK_MESSAGE}", no_filings, declined) if p)
+    if memo.answer == ai.IDK_MESSAGE:
+        return "\n\n".join(p for p in (ai.IDK_MESSAGE, no_filings, declined) if p)
 
     def section(title: str, items: list[str]) -> str:
-        return f"### {title}\n" + "\n".join(f"- {i}" for i in items)
+        return f"**{title}**\n" + "\n".join(f"- {i}" for i in items)
 
-    parts = [f"### Answer\n{memo.answer}"]
+    parts = [memo.answer]  # body text; only the section labels are bold, so the size matches the input
     outlook = ""
     if memo.outlook or memo.outlook_leaning:
         leaning = f"Leaning: {memo.outlook_leaning}\n" if memo.outlook_leaning else ""
         body = "\n".join(f"- {r}" for r in memo.outlook)
-        outlook = f"### {OUTLOOK_TITLE}\n{leaning}{body}\n\n{ADVISOR_NOTE}"
+        outlook = f"{OUTLOOK_TITLE}\n{leaning}{body}\n\n{ADVISOR_NOTE}"
     for title, items in (("Key figures", memo.key_figures), ("Sources", memo.sources), ("Outlook", None),
                          ("What I couldn't verify", memo.unverified)):
         if title == "Outlook":

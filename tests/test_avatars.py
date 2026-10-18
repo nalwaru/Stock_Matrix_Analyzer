@@ -17,3 +17,11 @@ def test_roles_map_to_their_avatar():
 def test_assistant_robot_is_light_yellow_not_blue_grey():
     text = Path(avatars.ASSISTANT_AVATAR).read_text().lower()
     assert "#fff1a8" in text and "#cfd8e6" not in text
+
+
+def test_busy_avatar_is_the_robot_with_signal_rings_that_animate_forever():
+    text = Path(avatars.ASSISTANT_AVATAR_BUSY).read_text()
+    assert ET.parse(avatars.ASSISTANT_AVATAR_BUSY).getroot().tag.endswith("svg")
+    assert "#FFF1A8" in text
+    assert text.count("<animate") >= 6 and text.count('repeatCount="indefinite"') == text.count("<animate")
+    assert "<script" not in text and "href" not in text.lower().replace("xlink", "")

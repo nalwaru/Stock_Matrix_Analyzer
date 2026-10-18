@@ -34,15 +34,15 @@ def test_cited_reasons_drops_uncited_and_unknown_labels():
 
 def test_render_memo_shows_outlook_section_with_estimate_label():
     md = render_memo(memo(outlook=[f"Valuation is moderate [{PE}]"], leaning="neutral"))
-    assert "### Outlook" in md and "not a filing fact and not financial advice" in md
+    assert "**Outlook**" in md and "not a filing fact and not financial advice" in md
     assert "neutral" in md.lower() and PE in md
 
 
 def test_render_memo_shows_declined_sentence():
     md = render_memo(memo(declined="buy advice"))
     assert "Not answered: buy advice" in md
-    assert "### Outlook" not in md
-    assert render_memo(idk_memo()) == f"### Answer\n{ai.IDK_MESSAGE}"
+    assert "**Outlook**" not in md
+    assert render_memo(idk_memo()) == ai.IDK_MESSAGE
 
 
 def test_synthesize_keeps_cited_outlook_and_drops_uncited():
@@ -151,7 +151,7 @@ def test_filing_note_appears_once_when_the_answer_needs_filings():
     out = run(memo(), outlook=False, no_filings=["ORCL"], graded=[], searched_filings=True)
     notes = [u for u in out.unverified if "filing" in u.lower()]
     assert notes == ["No SEC filings are available for ORCL"]
-    assert "No SEC filings are available" not in render_memo(out).split("### What I couldn't verify")[0]
+    assert "No SEC filings are available" not in render_memo(out).split("**What I couldn't verify**")[0]
     assert render_memo(out).count("No SEC filings are available for ORCL") == 1
 
 
@@ -160,7 +160,7 @@ def test_render_memo_hides_what_i_couldnt_verify_when_empty():
     md = render_memo(full)
     assert "What I couldn't verify" not in md and "None" not in md
     noted = Memo(answer="a", key_figures=[], sources=[], unverified=["Price unavailable"])
-    assert "### What I couldn't verify\n- Price unavailable" in render_memo(noted)
+    assert "**What I couldn't verify**\n- Price unavailable" in render_memo(noted)
 
 
 def test_sources_are_hidden_when_the_answer_is_idk():
@@ -174,30 +174,37 @@ def test_sources_are_hidden_when_the_answer_is_idk():
 def test_render_memo_hides_every_empty_section():
     bare = Memo(answer="The latest 10-K was filed on 2025-10-31.", key_figures=[], sources=[], unverified=[])
     md = render_memo(bare)
-    assert md == "### Answer\nThe latest 10-K was filed on 2025-10-31."
+    assert md == "The latest 10-K was filed on 2025-10-31."
     with_sources = Memo(answer="a", key_figures=[], sources=["x"], unverified=[])
     md = render_memo(with_sources)
-    assert "### Sources\n- x" in md and "Key figures" not in md and "None" not in md
+    assert "**Sources**\n- x" in md and "Key figures" not in md and "None" not in md
 
 
 def test_outlook_sits_after_sources_and_before_what_i_couldnt_verify():
     full = Memo(answer="a", key_figures=["k [x]"], sources=["s"], unverified=["u"],
                 outlook=[f"P/E is 30.0 [{PE}]"], outlook_leaning="neutral")
     md = render_memo(full)
-    assert md.index("### Sources") < md.index("### Outlook") < md.index("### What I couldn't verify")
+    assert md.index("**Sources**") < md.index("**Outlook**") < md.index("**What I couldn't verify**")
     lean = Memo(answer="a", key_figures=[], sources=[], unverified=[], outlook=[f"x [{PE}]"], outlook_leaning="neutral")
     md = render_memo(lean)
-    assert md.index("### Answer") < md.index("### Outlook") and "Sources" not in md
+    assert md.startswith("a\n") and "**Outlook**" in md and "Sources" not in md
 
 
 def test_outlook_precedes_unverified_even_when_other_sections_are_hidden():
     only = Memo(answer="a", key_figures=[], sources=[], unverified=["u"], outlook=[f"x [{PE}]"], outlook_leaning="neutral")
     md = render_memo(only)
-    assert md.index("### Outlook") < md.index("### What I couldn't verify")
+    assert md.index("**Outlook**") < md.index("**What I couldn't verify**")
 
 
-def test_idk_reply_uses_the_same_answer_heading_as_every_other_answer():
+def test_idk_reply_is_plain_body_text_followed_by_its_notes():
     md = render_memo(Memo(answer=ai.IDK_MESSAGE, key_figures=[], sources=[], unverified=[],
                           declined="recent news", no_filings=["ORCL"]))
-    assert md.startswith("### Answer\n" + ai.IDK_MESSAGE)
+    assert md.startswith(ai.IDK_MESSAGE)
     assert "No SEC filings are available for ORCL" in md and "Not answered: recent news" in md
+
+
+def test_replies_never_use_markdown_headings_so_text_matches_the_input_size():
+    full = Memo(answer="a", key_figures=["k [x]"], sources=["s"], unverified=["u"],
+                outlook=[f"P/E is 30.0 [{PE}]"], outlook_leaning="neutral", declined="news", no_filings=["ORCL"])
+    assert "#" not in render_memo(full)
+    assert "#" not in render_memo(idk_memo())

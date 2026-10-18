@@ -9,10 +9,10 @@ import plotly.express as px
 import streamlit as st
 from dotenv import load_dotenv
 
-from analyzer import ai, export, loading, market, portfolio, scenarios, schema
+from analyzer import ai, export, market, portfolio, scenarios, schema
 from agent import graph as agent_graph
 from agent import wiring as agent_wiring
-from analyzer.avatars import ASSISTANT_AVATAR, AVATARS, USER_AVATAR
+from analyzer.avatars import ASSISTANT_AVATAR_BUSY, AVATARS, USER_AVATAR
 from agent.memo import idk_memo, markdown_safe, render_memo, visible_sources
 
 load_dotenv()
@@ -250,12 +250,8 @@ def render_ask_ai(df: pd.DataFrame) -> None:
         with live.container():
             with st.chat_message("user", avatar=USER_AVATAR):
                 st.markdown(question)
-            with st.chat_message("assistant", avatar=ASSISTANT_AVATAR):
-                bag_col, status_col = st.columns([1, 5], vertical_alignment="center")
-                with bag_col:
-                    st.markdown(loading.transmitting_html(), unsafe_allow_html=True)
-                with status_col:
-                    status = st.status("Routing your question...", expanded=True)
+            with st.chat_message("assistant", avatar=ASSISTANT_AVATAR_BUSY):  # transmits while working
+                status = st.status("Routing your question...", expanded=True)
                 try:
                     for node, update in agent_graph.run_stream(
                         question, list(chat), context, list(df["Ticker"].unique()),
