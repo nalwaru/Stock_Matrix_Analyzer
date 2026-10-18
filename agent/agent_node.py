@@ -72,12 +72,48 @@ def agent_node(state: AgentState, deps: Deps) -> dict:
     acc: dict = {"trace": [], "facts": [], "charts": [], "graded": [], "quotes": {}}
     messages = _messages(state)
     seen: set[tuple[str, str]] = set()
-    ran = 0
-    analysts_ran = False
-    exhausted = True
-    limit_hit = False
-    stopped_early = False
+    counters = {"ran": 0, "analysts_ran": False, "limit_hit": False}
 
+    def execute(name: str, args: dict) -> str:
+        """Run one tool call (dedupe, cap, trace, merge) and return what the model is told."""
+        key = (name, json.dumps(args, sort_keys=True))
+        if key in seen:
+            return "Already run with these arguments; reuse the earlier result."
+        if (name == "run_analysts" and route.about_filings and not route.wants_outlook
+                and acc["graded"]):
+            line = "run_analysts: analysts skipped (the filings search already found passages)"
+            acc["trace"].append(line)
+            _step(deps, line)
+            return ("Not needed: the filings search already found passages. Answer from those "
+                    "passages; analysts are used only when the filings search finds nothing.")
+        if counters["ran"] >= MAX_AGENT_TOOL_CALLS:
+            counters["limit_hit"] = True
+            return "Tool call limit reached; no more tools can be run."
+        seen.add(key)
+        counters["ran"] += 1
+        start = time.perf_counter()
+        update = run_tool(name, args, work, deps)
+        elapsed = time.perf_counter() - start
+        line = f"Agent tool: {name}({json.dumps(args, sort_keys=True)}) {elapsed:.1f}s"
+        acc["trace"].append(line)
+        _step(deps, line)
+        _merge(acc, update)
+        if update["observation"].startswith("Tool error:"):
+            counters["ran"] -= 1  # a rejected call does not use up the budget
+        counters["analysts_ran"] = counters["analysts_ran"] or (
+            name == "run_analysts" and bool(update.get("facts")))
+        return update["observation"]
+
+    if route.about_filings and route.tickers:  # filings questions always search the filings first
+        forced = {"query": state["question"], "tickers": list(route.tickers)}
+        messages.append({"role": "assistant", "content": None, "tool_calls": [
+            {"id": "forced-filings", "type": "function",
+             "function": {"name": "search_filings", "arguments": json.dumps(forced)}}]})
+        messages.append({"role": "tool", "tool_call_id": "forced-filings",
+                         "content": execute("search_filings", forced)})
+
+    exhausted = True
+    stopped_early = False
     for _ in range(MAX_AGENT_TURNS):
         try:
             reply = chat_with_tools(messages, TOOL_SPECS, deps.model, deps.client)
@@ -93,7 +129,6 @@ def agent_node(state: AgentState, deps: Deps) -> dict:
         messages.append({"role": "assistant", "content": reply.content,
                          "tool_calls": [_call_dict(c) for c in calls]})
         for call in calls:
-            name = call.function.name
             try:
                 args = json.loads(call.function.arguments or "{}")
                 if not isinstance(args, dict):
@@ -101,29 +136,10 @@ def agent_node(state: AgentState, deps: Deps) -> dict:
             except ValueError:
                 content = "Tool error: arguments were not valid JSON"
             else:
-                key = (name, json.dumps(args, sort_keys=True))
-                if key in seen:
-                    content = "Already run with these arguments; reuse the earlier result."
-                elif ran >= MAX_AGENT_TOOL_CALLS:
-                    limit_hit = True
-                    content = "Tool call limit reached; no more tools can be run."
-                else:
-                    seen.add(key)
-                    ran += 1
-                    start = time.perf_counter()
-                    update = run_tool(name, args, work, deps)
-                    elapsed = time.perf_counter() - start
-                    line = f"Agent tool: {name}({json.dumps(args, sort_keys=True)}) {elapsed:.1f}s"
-                    acc["trace"].append(line)
-                    _step(deps, line)
-                    _merge(acc, update)
-                    if update["observation"].startswith("Tool error:"):
-                        ran -= 1  # a rejected call does not use up the budget
-                    analysts_ran = analysts_ran or (name == "run_analysts" and bool(update.get("facts")))
-                    content = update["observation"]
+                content = execute(call.function.name, args)
             messages.append({"role": "tool", "tool_call_id": call.id, "content": content})
 
-    if route.wants_outlook and not analysts_ran:
+    if route.wants_outlook and not counters["analysts_ran"]:
         for ticker in route.tickers[:MAX_OUTLOOK_TICKERS]:
             update = run_tool("run_analysts", {"ticker": ticker, "kinds": OUTLOOK_KINDS}, work, deps)
             line = f"Agent tool: run_analysts({ticker}, fundamental/risk/ownership; required for an outlook)"
@@ -131,6 +147,6 @@ def agent_node(state: AgentState, deps: Deps) -> dict:
             _step(deps, line)
             _merge(acc, update)
 
-    acc["step_limit_hit"] = limit_hit or exhausted
+    acc["step_limit_hit"] = counters["limit_hit"] or exhausted
     acc["agent_stopped_early"] = stopped_early
     return acc

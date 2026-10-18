@@ -43,6 +43,13 @@ def test_score_flags_a_chart_when_the_case_expects_none():
     assert failures == ["chart shown but none expected"]
 
 
+def test_score_flags_a_forbidden_tool():
+    case = {"question": "q", "expect_tools": [], "expect_sections": [], "forbid": [], "forbid_tools": ["run_analysts"]}
+    ran = final(plain(), ['Agent tool: run_analysts({"ticker": "AAPL"}) 1.0s'])
+    assert score(case, ran) == ["tool must not be called: run_analysts"]
+    assert score(case, final(plain(), [])) == []
+
+
 def test_score_idk_section():
     case = {"question": "q", "expect_tools": [], "expect_sections": ["idk"], "forbid": []}
     idk = Memo(answer=ai.IDK_MESSAGE, key_figures=[], sources=[], unverified=[])

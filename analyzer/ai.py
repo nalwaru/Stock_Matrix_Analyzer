@@ -151,6 +151,8 @@ def safe_error(exc: OpenAIError) -> AIError:
         return AIError("OpenAI quota or rate limit reached. Check billing or retry later.")
     if isinstance(exc, APIConnectionError):
         return AIError("Could not reach OpenAI or the request timed out.")
+    if getattr(exc, "status_code", None) == 402:
+        return AIError("The model provider reports no credits left. Add credits and retry.")
     return AIError("OpenAI could not complete the request.")
 
 

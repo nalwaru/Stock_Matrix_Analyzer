@@ -12,6 +12,7 @@ class RouteDecision(BaseModel):
     tickers: list[str]
     reason: str
     wants_outlook: bool = False
+    about_filings: bool = False
     declined_part: str = ""
 
 

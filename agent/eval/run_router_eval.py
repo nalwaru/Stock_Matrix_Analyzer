@@ -59,7 +59,8 @@ def main() -> int:
     for question, want, got in ticker_misses(load_cases(), lambda q: full(q).tickers):
         print(f"  TICKER MISS {question!r}: expected {want}, got {got}")
     for key, getter in (("expected_wants_outlook", lambda q: full(q).wants_outlook),
-                        ("expected_declined", lambda q: bool(full(q).declined_part))):
+                        ("expected_declined", lambda q: bool(full(q).declined_part)),
+                        ("expected_about_filings", lambda q: full(q).about_filings)):
         for question, want, got in flag_misses(load_cases(), key, getter):
             print(f"  {key.upper()} MISS {question!r}: expected {want}, got {got}")
     return 0

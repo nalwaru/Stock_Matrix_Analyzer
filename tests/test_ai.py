@@ -199,3 +199,13 @@ def test_reply_citing_a_retrieved_source_is_kept():
 def test_citation_without_any_passages_becomes_idk():
     client = FakeClient(text="See [AAPL 10-K, 2025-11-01, Item 7].")
     assert ai.chat_reply(SUMMARY, [], "q", "m", client=client) == ai.IDK_MESSAGE
+
+
+def test_safe_error_names_exhausted_credits_without_blaming_openai():
+    import httpx
+    import openai
+    request = httpx.Request("POST", "https://openrouter.ai/api/v1/chat/completions")
+    response = httpx.Response(402, request=request, json={"error": {"message": "credits"}})
+    exc = openai.APIStatusError("credits", response=response, body=None)
+    message = str(ai.safe_error(exc))
+    assert "credits" in message.lower() and "OpenAI could not" not in message

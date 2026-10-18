@@ -8,10 +8,11 @@ from tests.test_agent_analysis_node import FakeData
 from tests.test_agent_portfolio_tools import frame
 
 
-def state(tickers=("AAPL",), outlook=False):
+def state(tickers=("AAPL",), outlook=False, filings=False):
     return {"question": "What is Apple's profit?", "today": "2026-10-18", "history": [],
             "held_tickers": ["AAPL", "NVDA"], "portfolio_json": "{}",
-            "route": RouteDecision(route="agent", tickers=list(tickers), reason="r", wants_outlook=outlook)}
+            "route": RouteDecision(route="agent", tickers=list(tickers), reason="r", wants_outlook=outlook,
+                                   about_filings=filings)}
 
 
 def deps_with(turns, **kw):
@@ -160,3 +161,50 @@ def test_invalid_tool_calls_do_not_use_up_the_tool_call_cap():
     client, deps = deps_with([assistant(tool_calls=[bad, *good]), assistant("done")])
     out = agent_node(state(), deps)
     assert out["step_limit_hit"] is False
+
+
+def analysts_call(i="a1"):
+    return tool_call(i, "run_analysts", {"ticker": "AAPL", "kinds": ["fundamental"]})
+
+
+def analyst_facts(out):
+    return [f for f in out["facts"] if " fundamental," in f.label]
+
+
+def test_filing_question_searches_filings_before_the_model_chooses_anything():
+    client, deps = deps_with([assistant("done")])
+    out = agent_node(state(filings=True), deps)
+    assert [p.id for p in out["graded"]] == ["id1"] and out["searched_filings"] is True
+    first_tool_line = [line for line in out["trace"] if line.startswith("Agent tool:")][0]
+    assert first_tool_line.startswith("Agent tool: search_filings(")
+    forced = [m for m in client.calls[0]["messages"] if m.get("tool_call_id") == "forced-filings"]
+    assert len(forced) == 1 and "[AAPL 10-K" in forced[0]["content"]
+
+
+def test_analysts_are_blocked_while_the_filings_search_found_passages():
+    client, deps = deps_with([assistant(tool_calls=[analysts_call()]), assistant("done")])
+    out = agent_node(state(filings=True), deps)
+    assert analyst_facts(out) == []
+    blocked = [m for m in client.calls[1]["messages"] if m.get("tool_call_id") == "a1"][0]
+    assert "not needed" in blocked["content"].lower()
+    assert any("analysts skipped" in line for line in out["trace"])
+
+
+def test_analysts_run_when_the_filings_search_found_nothing():
+    client, deps = deps_with([assistant(tool_calls=[analysts_call()]), assistant("done")])
+    from dataclasses import replace
+    deps = replace(deps, retrieve=lambda q, t: [])
+    out = agent_node(state(filings=True), deps)
+    assert out["graded"] == [] and analyst_facts(out)
+
+
+def test_outlook_questions_still_run_the_analysts_after_a_filings_hit():
+    client, deps = deps_with([assistant("done")])
+    out = agent_node(state(filings=True, outlook=True), deps)
+    assert out["graded"] and analyst_facts(out)
+
+
+def test_questions_not_about_filings_are_unchanged():
+    client, deps = deps_with([assistant(tool_calls=[analysts_call()]), assistant("done")])
+    out = agent_node(state(filings=False), deps)
+    assert out["graded"] == [] and analyst_facts(out) and not out.get("searched_filings")

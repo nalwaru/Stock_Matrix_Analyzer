@@ -27,6 +27,7 @@ def score(case: dict, state: dict) -> list[str]:
     memo = state["memo"]
     called = {m.group(1) for line in state.get("trace", []) if (m := _TOOL_LINE.match(line))}
     failures = [f"tool not called: {t}" for t in case["expect_tools"] if t not in called]
+    failures += [f"tool must not be called: {t}" for t in case.get("forbid_tools", []) if t in called]
     has = {
         "outlook": bool(memo.outlook or memo.outlook_leaning),
         "declined": bool(memo.declined),

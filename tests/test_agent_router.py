@@ -94,3 +94,56 @@ def test_router_uses_its_own_client_and_model_when_configured():
     assert out["route"].route == "live_price"
     assert not main.calls and own.calls[0]["model"] == "x/y"
     assert own.calls[0]["extra_body"] == {"provider": {"require_parameters": True}}
+
+
+def test_router_keeps_the_about_filings_flag():
+    d = RouteDecision(route="agent", tickers=["AAPL"], reason="r", about_filings=True)
+    out = router_node(state("What are Apple's 10-K risk factors?"), deps(FakeClient(d)))
+    assert out["route"].about_filings is True
+    assert RouteDecision(route="agent", tickers=[], reason="r").about_filings is False
+
+
+def test_router_prompt_defines_about_filings():
+    from agent.nodes import ROUTER_PROMPT
+    assert "about_filings" in ROUTER_PROMPT
+
+
+class FlakyClient:
+    """Fails the first `failures` calls, then returns the decision."""
+
+    def __init__(self, decision, failures):
+        self.decision, self.failures, self.calls = decision, failures, 0
+        self.chat = NS(completions=NS(parse=self._parse))
+
+    def _parse(self, **kwargs):
+        self.calls += 1
+        if self.calls <= self.failures:
+            raise openai.OpenAIError("transient")
+        return NS(choices=[NS(message=NS(parsed=self.decision, refusal=None))])
+
+
+def test_router_retries_once_after_a_transient_failure():
+    client = FlakyClient(decision("agent", ["AAPL"]), failures=1)
+    out = router_node(state(), deps(client))
+    assert out["route"].route == "agent" and client.calls == 2
+
+
+def test_router_gives_up_after_two_failures_and_falls_back():
+    client = FlakyClient(decision("agent", ["AAPL"]), failures=2)
+    out = router_node(state(), deps(client))
+    assert out["route"].route == "portfolio_only" and client.calls == 2
+    assert "routing failed" in out["trace"][0].lower()
+
+
+def test_gate_falls_back_to_the_openai_model_when_the_router_model_keeps_failing():
+    from dataclasses import replace
+    broken = FakeClient(error=openai.OpenAIError("402"))
+    main = FakeClient(decision("agent", ["AAPL"]))
+    out = router_node(state(), replace(deps(main), router_client=broken, router_model="x/y"))
+    assert out["route"].route == "agent" and len(broken.calls) == 2 and len(main.calls) == 1
+    assert "fallback" in out["trace"][0].lower()
+
+
+def test_gate_without_a_router_model_has_no_fallback_note():
+    out = router_node(state(), deps(FakeClient(decision("agent", ["AAPL"]))))
+    assert "fallback" not in out["trace"][0].lower()

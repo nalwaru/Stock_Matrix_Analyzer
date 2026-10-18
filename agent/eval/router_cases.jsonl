@@ -24,7 +24,7 @@
 {"question": "technical analysis orcale", "expected_route": "agent", "expected_tickers": ["ORCL"]}
 {"question": "technical analysis for oracle", "expected_route": "agent", "expected_tickers": ["ORCL"]}
 {"question": "how risky is Rivian?", "expected_route": "agent", "expected_tickers": ["RIVN"]}
-{"question": "is Nvidia overbought?", "expected_route": "agent", "expected_tickers": ["NVDA"]}
+{"question": "is Nvidia overbought?", "expected_route": "agent", "expected_tickers": ["NVDA"], "expected_about_filings": false}
 {"question": "What if tech stocks drop 20%?", "expected_route": "portfolio_only"}
 {"question": "How much would I lose if my equities fell 15%?", "expected_route": "portfolio_only"}
 {"question": "Stress test my portfolio with a 10% market drop", "expected_route": "portfolio_only"}
@@ -35,9 +35,11 @@
 {"question": "How is my Apple position exposed to the risks in its 10-K?", "expected_route": "agent"}
 {"question": "tala outlook", "expected_route": "out_of_scope"}
 {"question": "What is the outlook for Zorblax Corp?", "expected_route": "out_of_scope"}
-{"question": "oracle outlook?", "expected_route": "agent", "expected_tickers": ["ORCL"], "expected_wants_outlook": true}
+{"question": "oracle outlook?", "expected_route": "agent", "expected_tickers": ["ORCL"], "expected_wants_outlook": true, "expected_about_filings": false}
 {"question": "rivianll price", "expected_route": "live_price", "expected_tickers": ["RIVN"]}
 {"question": "latest news on apple", "expected_route": "out_of_scope", "expected_declined": true}
 {"question": "latest update on apple", "expected_route": "out_of_scope", "expected_declined": true}
 {"question": "What were Apple's latest quarterly results?", "expected_route": "agent", "expected_tickers": ["AAPL"]}
 {"question": "Apple news and its P/E ratio", "expected_route": "agent", "expected_tickers": ["AAPL"], "expected_declined": true}
+{"question": "latest 10-K from apple", "expected_route": "agent", "expected_tickers": ["AAPL"], "expected_about_filings": true}
+{"question": "What did Apple's 10-Q say about legal proceedings?", "expected_route": "agent", "expected_tickers": ["AAPL"], "expected_about_filings": true}

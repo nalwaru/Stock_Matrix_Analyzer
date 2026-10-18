@@ -39,6 +39,10 @@ ROUTER_PROMPT = (
     "way set declined_part to exactly: recent news (no news source here; only SEC filings, "
     "analyst data and prices). A question about the latest results, filings or earnings is "
     "answerable and is not a news request.\n"
+    "Set about_filings true when the question is about the content or the existence of SEC "
+    "filings (10-K, 10-Q, 8-K, annual or quarterly reports): their results, risks, business, "
+    "legal matters, or which filing is the latest; otherwise false. Such questions search the "
+    "filings first.\n"
     "Set wants_outlook true whenever ANY part of the question asks about a company's future "
     "business or growth (for example 'do you expect growth next year?', 'what is the outlook "
     "for Apple?'), even if another part asks for a past fact such as profit; otherwise false.\n"
@@ -57,6 +61,30 @@ NEXT_NODE = {
     "live_price": "price", "portfolio_only": "tools", "agent": "agent", "out_of_scope": "refuse",
 }
 MAX_HELD_DEFAULT = 3
+GATE_ATTEMPTS = 2
+
+
+def _gate_call(messages: list[dict], model: str, client, extra_body=None) -> RouteDecision:
+    """One gate call, retried once: the auto-router occasionally fails on a single call."""
+    for attempt in range(GATE_ATTEMPTS):
+        try:
+            return ask_structured(messages, RouteDecision, model, client, extra_body=extra_body)
+        except ai.AIError:
+            if attempt == GATE_ATTEMPTS - 1:
+                raise
+
+
+def _ask_gate(messages: list[dict], deps: Deps) -> tuple[RouteDecision, str]:
+    """Ask the gate; if the router model keeps failing, the main model answers.
+
+    Returns (decision, note); the note is empty unless the fallback was used."""
+    if not deps.router_model:
+        return _gate_call(messages, deps.model, deps.client), ""
+    try:
+        return _gate_call(messages, deps.router_model, deps.router_client, OPENROUTER_BODY), ""
+    except ai.AIError as failure:
+        decision = _gate_call(messages, deps.model, deps.client)
+        return decision, f"router model failed ({failure}); fallback to the OpenAI model"
 
 
 def router_node(state: AgentState, deps: Deps) -> dict:
@@ -70,11 +98,7 @@ def router_node(state: AgentState, deps: Deps) -> dict:
         )},
     ]
     try:
-        if deps.router_model:
-            decision = ask_structured(messages, RouteDecision, deps.router_model, deps.router_client,
-                                      extra_body=OPENROUTER_BODY)
-        else:
-            decision = ask_structured(messages, RouteDecision, deps.model, deps.client)
+        decision, note = _ask_gate(messages, deps)
     except ai.AIError as exc:
         return {
             "route": RouteDecision(route="portfolio_only", tickers=[], reason="routing failed"),
@@ -89,6 +113,10 @@ def router_node(state: AgentState, deps: Deps) -> dict:
         elif route == "agent":
             tickers = held[:MAX_HELD_DEFAULT]
     line = f"Router: {route} ({decision.reason})"
+    if note:
+        line += f"; {note}"
+    if decision.about_filings:
+        line += "; filings first"
     if decision.wants_outlook:
         line += "; outlook requested"
     if decision.declined_part:
@@ -96,6 +124,7 @@ def router_node(state: AgentState, deps: Deps) -> dict:
     return {
         "route": RouteDecision(route=route, tickers=tickers, reason=decision.reason,
                                wants_outlook=decision.wants_outlook,
+                               about_filings=decision.about_filings,
                                declined_part=decision.declined_part),
         "tickers": tickers,
         "trace": [line],
