@@ -253,7 +253,7 @@ def render_ask_ai(df: pd.DataFrame) -> None:
             with st.chat_message("assistant", avatar=ASSISTANT_AVATAR):
                 bag_col, status_col = st.columns([1, 5], vertical_alignment="center")
                 with bag_col:
-                    st.markdown(loading.money_bag_html(), unsafe_allow_html=True)
+                    st.markdown(loading.transmitting_html(), unsafe_allow_html=True)
                 with status_col:
                     status = st.status("Routing your question...", expanded=True)
                 try:

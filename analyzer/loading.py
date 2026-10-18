@@ -1,32 +1,31 @@
-"""Self-contained HTML/CSS 'working' animation: a money bag with gold coins popping out.
+"""Self-contained HTML/CSS 'working' animation: the robot helper transmitting a signal.
 
-No scripts and no external requests; coins are drawn with CSS so they look the same everywhere."""
+No scripts and no external requests; the robot is the assistant avatar drawn inline, and the
+signal is a set of rings that ripple out of its antenna."""
+from pathlib import Path
 
-COIN_COUNT = 6
-# (horizontal drift in px, rotation in degrees) per coin: fanned out, not in lockstep
-_COINS = [(-46, -200), (-24, 160), (-6, -120), (14, 220), (34, -180), (54, 140)]
+WAVE_COUNT = 3
+_WAVE_DELAY = 0.6  # seconds between rings
+_ROBOT = (Path(__file__).parent.parent / "assets" / "assistant-avatar.svg").read_text()
+_ROBOT_INNER = _ROBOT[_ROBOT.index(">") + 1: _ROBOT.rindex("</svg>")]
 _STYLE = """
 <style>
-.mb-wrap{position:relative;width:170px;height:104px;margin:2px 0 6px}
-.mb-bag{position:absolute;left:10px;bottom:0;font-size:58px;line-height:1;transform-origin:50% 92%;
-        animation:mb-wobble 1.2s ease-in-out infinite}
-.mb-coin{position:absolute;left:48px;bottom:46px;width:22px;height:22px;border-radius:50%;
-         background:#f4be34;border:2px solid #cc8c14;box-sizing:border-box;color:#6e4600;
-         font:700 13px/18px Arial,sans-serif;text-align:center;opacity:0;
-         animation:mb-pop 1.8s ease-out infinite}
-@keyframes mb-wobble{0%,100%{transform:rotate(-4deg) scale(1)}50%{transform:rotate(4deg) scale(1.06)}}
-@keyframes mb-pop{0%{opacity:0;transform:translate(0,0) scale(.5) rotate(0)}
-                  15%{opacity:1}
-                  100%{opacity:0;transform:translate(var(--dx),-84px) scale(1) rotate(var(--rot))}}
-@media (prefers-reduced-motion: reduce){.mb-bag,.mb-coin{animation:none}.mb-coin{display:none}}
+.rb-wrap{width:110px;height:110px;margin:2px 0 6px}
+.rb-robot{animation:rb-bob 1.6s ease-in-out infinite}
+.rb-wave{fill:none;stroke:#E0A113;stroke-width:2.5;opacity:0;transform-box:fill-box;
+         transform-origin:center;animation:rb-ping 1.8s ease-out infinite}
+@keyframes rb-ping{0%{opacity:.9;transform:scale(.4)}100%{opacity:0;transform:scale(3.4)}}
+@keyframes rb-bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-2px)}}
+@media (prefers-reduced-motion: reduce){.rb-robot,.rb-wave{animation:none}.rb-wave{opacity:.5}}
 </style>
 """
 
 
-def money_bag_html() -> str:
-    coins = "".join(
-        f'<span class="mb-coin" style="--dx:{dx}px;--rot:{rot}deg;animation-delay:{i * 0.3:.1f}s">$</span>'
-        for i, (dx, rot) in enumerate(_COINS)
+def transmitting_html() -> str:
+    waves = "".join(
+        f'<circle class="rb-wave" cx="32" cy="5" r="6" style="animation-delay:{i * _WAVE_DELAY:.1f}s"/>'
+        for i in range(WAVE_COUNT)
     )
-    return (f'{_STYLE}<div class="mb-wrap" role="img" aria-label="Working on your question">'
-            f'<span class="mb-bag">\U0001F4B0</span>{coins}</div>')
+    return (f'{_STYLE}<div class="rb-wrap" role="img" aria-label="Working on your question">'
+            f'<svg viewBox="-16 -24 96 96" width="110" height="110">{waves}'
+            f'<g class="rb-robot">{_ROBOT_INNER}</g></svg></div>')

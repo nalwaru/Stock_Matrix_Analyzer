@@ -35,7 +35,7 @@ def test_render_memo_has_four_sections_and_idk_is_plain():
     md = render_memo(memo("Sales rose.", ["Sales: $5"], [LABEL], ["Price unavailable"]))
     for heading in ("Answer", "Key figures", "Sources", "What I couldn't verify"):
         assert f"### {heading}" in md
-    assert render_memo(idk_memo()) == ai.IDK_MESSAGE
+    assert render_memo(idk_memo()) == f"### Answer\n{ai.IDK_MESSAGE}"
 
 
 def test_labels_cover_graded_passages_and_priced_quotes_only():

@@ -74,8 +74,8 @@ def render_memo(memo: Memo) -> str:
     declined = f"_Not answered: {memo.declined}_" if memo.declined else ""
     no_filings = (f"_No SEC filings are available for {', '.join(memo.no_filings)}._"
                   if memo.no_filings else "")
-    if memo.answer == ai.IDK_MESSAGE:
-        return "\n\n".join(p for p in (ai.IDK_MESSAGE, no_filings, declined) if p)
+    if memo.answer == ai.IDK_MESSAGE:  # same Answer heading as every other reply
+        return "\n\n".join(p for p in (f"### Answer\n{ai.IDK_MESSAGE}", no_filings, declined) if p)
 
     def section(title: str, items: list[str]) -> str:
         return f"### {title}\n" + "\n".join(f"- {i}" for i in items)

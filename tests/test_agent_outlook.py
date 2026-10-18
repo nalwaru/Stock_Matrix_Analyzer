@@ -42,7 +42,7 @@ def test_render_memo_shows_declined_sentence():
     md = render_memo(memo(declined="buy advice"))
     assert "Not answered: buy advice" in md
     assert "### Outlook" not in md
-    assert render_memo(idk_memo()) == ai.IDK_MESSAGE
+    assert render_memo(idk_memo()) == f"### Answer\n{ai.IDK_MESSAGE}"
 
 
 def test_synthesize_keeps_cited_outlook_and_drops_uncited():
@@ -194,3 +194,10 @@ def test_outlook_precedes_unverified_even_when_other_sections_are_hidden():
     only = Memo(answer="a", key_figures=[], sources=[], unverified=["u"], outlook=[f"x [{PE}]"], outlook_leaning="neutral")
     md = render_memo(only)
     assert md.index("### Outlook") < md.index("### What I couldn't verify")
+
+
+def test_idk_reply_uses_the_same_answer_heading_as_every_other_answer():
+    md = render_memo(Memo(answer=ai.IDK_MESSAGE, key_figures=[], sources=[], unverified=[],
+                          declined="recent news", no_filings=["ORCL"]))
+    assert md.startswith("### Answer\n" + ai.IDK_MESSAGE)
+    assert "No SEC filings are available for ORCL" in md and "Not answered: recent news" in md
