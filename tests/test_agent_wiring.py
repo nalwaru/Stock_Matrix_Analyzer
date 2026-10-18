@@ -73,3 +73,9 @@ def test_make_deps_list_filings_is_cached_per_ticker(monkeypatch):
     deps = make_deps(lambda: pc, "semantic", pinecone_key="k")
     deps.list_filings("AAPL"); deps.list_filings("AAPL"); deps.list_filings("MSFT")
     assert calls == ["AAPL", "MSFT"]
+
+
+def test_rivian_is_an_indexed_ticker_with_filings():
+    from rag import store
+    assert "RIVN" in store.INDEXED_TICKERS and "AAPL" in store.INDEXED_TICKERS
+    assert "RIVN" in make_deps(lambda: object(), "semantic", pinecone_key="k").indexed_tickers
