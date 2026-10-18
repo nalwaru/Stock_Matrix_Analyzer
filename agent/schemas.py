@@ -46,15 +46,5 @@ class CalcCall(BaseModel):
     order: Literal["largest", "smallest"] | None = None
 
 
-class FilingCall(BaseModel):
-    """One lookup in locally stored SEC filings; unused arguments are null."""
-    tool: Literal["get_section", "compare_periods", "list_filings"]
-    ticker: str
-    form: Literal["10-K", "10-Q", "8-K"] | None = None
-    section: str | None = None
-    row_label: str | None = None
-
-
 class ToolPlan(BaseModel):
     calc_calls: list[CalcCall]
-    filing_calls: list[FilingCall]

@@ -2,7 +2,7 @@ import openai
 import pandas as pd
 
 from agent.nodes import tools_node
-from agent.schemas import CalcCall, FilingCall, RouteDecision, ToolPlan
+from agent.schemas import CalcCall, RouteDecision, ToolPlan
 from agent.tools.portfolio import run_calc
 from tests.agent_fakes import ScriptedClient, make_deps
 
@@ -72,8 +72,8 @@ def state(route="portfolio_only"):
     return {"question": "q", "route": RouteDecision(route=route, tickers=[], reason="r")}
 
 
-def plan(calc=(), filing=()):
-    return ToolPlan(calc_calls=list(calc), filing_calls=list(filing))
+def plan(calc=()):
+    return ToolPlan(calc_calls=list(calc))
 
 
 def test_tools_node_runs_calc_calls_and_adds_facts():

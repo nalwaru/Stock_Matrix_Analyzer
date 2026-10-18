@@ -29,11 +29,11 @@ class ScriptedClient:
 
 
 def make_deps(client=None, retrieve=None, quotes=None, indexed=("AAPL",), holdings=None,
-              analyst_data=None, filings_dir=None):
+              analyst_data=None):
     return Deps(
         client=client, model="m",
         retrieve=retrieve or (lambda q, t: []),
         fetch_quotes=quotes or (lambda t: {}),
         indexed_tickers=list(indexed),
-        holdings=holdings, analyst_data=analyst_data, filings_dir=filings_dir,
+        holdings=holdings, analyst_data=analyst_data,
     )

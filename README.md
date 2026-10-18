@@ -51,7 +51,6 @@ Every Ask AI question runs through a LangGraph graph (`agent/`): a **router** (s
 
 All tool results are computed in Python and returned as cited facts; the model only writes the memo.
 - **Portfolio calculator** (`portfolio_only` route): holding, asset-class weight, top-N, totals and what-if stress, chosen by a planner call (max 3 calls).
-- **Filing tools** (filings routes): `get_section`, `compare_periods`, `list_filings` over `data/filings/` (run `uv run python -m rag.build_index` first).
 - **Price history** (price path): 1-day, 1-week and 1-month changes from Yahoo.
 - **Analysts** (`analysis` route, max 3 tickers): technical (SMA/EMA, RSI, MACD, Bollinger, ATR, volume, 52-week range, support/resistance), risk (volatility, beta vs SPY, drawdown, Sharpe at an assumed 4% risk-free rate, correlations), fundamental (valuation, margins, growth, debt, cash flow, dividend) and ownership (consensus, price targets, rating changes, holders, insiders, earnings date). Data is Yahoo Finance via `yfinance` (unofficial; missing fields show as "unavailable").
 - **Number checker:** figures in a memo that appear in no supplied source are listed under "What I couldn't verify". RSI/ATR use Wilder smoothing seeded from the first value, so they can differ slightly from charting sites.

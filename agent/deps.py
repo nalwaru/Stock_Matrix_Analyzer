@@ -14,6 +14,5 @@ class Deps:
     indexed_tickers: list[str]
     holdings: object = None  # enriched holdings DataFrame for the portfolio calculator
     analyst_data: object = None  # YahooData-like adapter for the analysts
-    filings_dir: object = None  # Path to downloaded filings for the filing tools
     router_client: object = None  # separate client (e.g. OpenRouter) for the router only
     router_model: str = ""  # when empty the router uses `client` and `model` like every node

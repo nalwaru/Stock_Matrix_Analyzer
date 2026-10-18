@@ -1,5 +1,5 @@
 from agent.memo import check_numbers, labels_for
-from agent.nodes import (route_after_grade, route_after_router, route_after_tools,
+from agent.nodes import (route_after_grade, route_after_router,
                          synthesize_node)
 from agent.schemas import Memo, RouteDecision
 from agent.state import Fact
@@ -59,12 +59,9 @@ def test_analysis_route_without_any_evidence_is_idk():
 def test_routing_functions_for_tools():
     assert route_after_router({"route": route("portfolio_only")}) == "tools"
     assert route_after_router({"route": route("analysis")}) == "analysis"
-    assert route_after_grade({"route": route("sec_filings"), "graded": [passage(1)]}) == "tools"
-    assert route_after_grade({"route": route("sec_filings"), "graded": [], "rewrites": 2}) == "tools"
+    assert route_after_grade({"route": route("sec_filings"), "graded": [passage(1)]}) == "synthesize"
+    assert route_after_grade({"route": route("sec_filings"), "graded": [], "rewrites": 2}) == "synthesize"
     assert route_after_grade({"route": route("sec_filings"), "graded": [], "rewrites": 0}) == "rewrite"
-    assert route_after_tools({"route": route("both")}) == "price"
-    assert route_after_tools({"route": route("sec_filings")}) == "synthesize"
-    assert route_after_tools({"route": route("portfolio_only")}) == "synthesize"
 
 
 def test_check_numbers_sees_numbers_inside_bracketed_json_evidence():

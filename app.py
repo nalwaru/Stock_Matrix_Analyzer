@@ -17,7 +17,6 @@ from agent.memo import idk_memo, markdown_safe, render_memo
 load_dotenv()
 
 SAMPLE_PATH = Path(__file__).parent / "data" / "sample_portfolio.csv"
-FILINGS_DIR = Path(__file__).parent / "data" / "filings"
 
 st.set_page_config(page_title="Stock Portfolio Analyzer", page_icon="📈", layout="wide")
 st.title("Stock Portfolio Analyzer")
@@ -263,7 +262,7 @@ def render_ask_ai(df: pd.DataFrame) -> None:
                         agent_wiring.make_deps(
                             pinecone_client, os.getenv("RAG_NAMESPACE", "semantic"),
                             os.getenv("PINECONE_API_KEY", ""),
-                            holdings=df, analyst_data=yahoo_data(), filings_dir=FILINGS_DIR,
+                            holdings=df, analyst_data=yahoo_data(),
                         ),
                     ):
                         if node == "done":

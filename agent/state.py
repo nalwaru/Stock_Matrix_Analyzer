@@ -33,4 +33,5 @@ class AgentState(TypedDict, total=False):
     memo: object  # schemas.Memo
     facts: Annotated[list[Fact], operator.add]  # tool results; nodes append
     charts: Annotated[list, operator.add]  # plotly figures built by analysts
+    timings: Annotated[list[tuple[str, float]], operator.add]  # (node, seconds) per node run
     trace: Annotated[list[str], operator.add]  # nodes append; the graph concatenates

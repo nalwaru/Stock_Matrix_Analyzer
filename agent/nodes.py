@@ -1,6 +1,4 @@
 """Graph nodes. Each takes (state, deps) and returns a partial state update."""
-from pathlib import Path
-
 from agent.deps import Deps
 from agent.llm import ask_structured
 from agent.memo import (check_numbers, idk_memo, labels_for, passage_label, portfolio_label,
@@ -13,7 +11,6 @@ from agent.analysts.fundamental import analyze_fundamental
 from agent.analysts.ownership import analyze_ownership
 from agent.analysts.risk import analyze_risk
 from agent.analysts.technical import analyze_technical
-from agent.tools import filings as filing_tools
 from agent.tools.history import price_changes
 from agent.tools.portfolio import run_calc
 from analyzer import ai
@@ -175,12 +172,8 @@ def rewrite_node(state: AgentState, deps: Deps) -> dict:
 
 def route_after_grade(state: AgentState) -> str:
     if state.get("graded") or state.get("rewrites", 0) >= MAX_REWRITES:
-        return "tools"
+        return "price" if state["route"].route == "both" else "synthesize"
     return "rewrite"
-
-
-def route_after_tools(state: AgentState) -> str:
-    return "price" if state["route"].route == "both" else "synthesize"
 
 
 MAX_TOOL_CALLS = 3
@@ -194,11 +187,7 @@ PLANNER_PROMPT = (
     "top_n(metric, n, order) for holdings ranked by Current_Value, Gain_Loss, Gain_Loss_Pct "
     "or Day_Change: order 'largest' for biggest gainers or largest positions, order "
     "'smallest' for the biggest losers, worst performers or smallest positions; total() for portfolio totals; stress(asset_class, shock_pct) for a "
-    "what-if move of an asset class in percent (for example -20).\n"
-    "Filing tools (filing_calls), over SEC filings stored locally: get_section(ticker, form, "
-    "section like 'Item 7') returns a whole filing section; compare_periods(ticker, "
-    "row_label like 'Total net sales') returns that table row from the latest filings, "
-    "for comparing periods; list_filings(ticker) lists available filings."
+    "what-if move of an asset class in percent (for example -20)."
 )
 
 
@@ -209,17 +198,10 @@ def _today() -> str:
 
 
 def tools_node(state: AgentState, deps: Deps) -> dict:
-    route = state["route"]
-    use_calc = route.route == "portfolio_only" and deps.holdings is not None
-    use_filing = (route.route in FILING_ROUTES and deps.filings_dir is not None
-                  and Path(deps.filings_dir).is_dir())
-    if not (use_calc or use_filing):
+    if state["route"].route != "portfolio_only" or deps.holdings is None:
         return {"trace": []}
-    if use_calc:
-        menu = (f"Tickers: {', '.join(deps.holdings['Ticker'])}\n"
-                f"Asset classes: {', '.join(sorted(set(deps.holdings['Asset_Class'])))}")
-    else:
-        menu = f"Tickers with local filings: {', '.join(route.tickers)}"
+    menu = (f"Tickers: {', '.join(deps.holdings['Ticker'])}\n"
+            f"Asset classes: {', '.join(sorted(set(deps.holdings['Asset_Class'])))}")
     messages = [
         {"role": "system", "content": PLANNER_PROMPT},
         {"role": "user", "content": f"{menu}\n\nQuestion: {state['question']}"},
@@ -229,26 +211,12 @@ def tools_node(state: AgentState, deps: Deps) -> dict:
     except ai.AIError as exc:
         return {"trace": [f"Tool planner failed ({exc}); continuing without tools"]}
     today = _today()
-    calls = [("calc", c) for c in plan.calc_calls] if use_calc else []
-    calls += [("filing", c) for c in plan.filing_calls] if use_filing else []
-    facts, skipped = [], 0
-    for kind, call in calls[:MAX_TOOL_CALLS]:
-        if kind == "calc":
-            found = [run_calc(deps.holdings, call, today)]
-        elif call.tool == "get_section":
-            found = [filing_tools.get_section(call.ticker, call.form or "10-K", call.section or "", deps.filings_dir)]
-        elif call.tool == "compare_periods" and call.row_label:
-            found = filing_tools.compare_periods(call.ticker, call.row_label, deps.filings_dir)
-        elif call.tool == "list_filings":
-            found = [filing_tools.list_filings(call.ticker, deps.filings_dir, today)]
-        else:
-            found = []
-        found = [f for f in found if f is not None]
-        facts += found
-        skipped += 0 if found else 1
-    line = f"Tools: ran {len(calls[:MAX_TOOL_CALLS]) - skipped} lookups -> {len(facts)} facts"
+    calls = plan.calc_calls[:MAX_TOOL_CALLS]
+    facts = [f for f in (run_calc(deps.holdings, c, today) for c in calls) if f is not None]
+    skipped = len(calls) - len(facts)
+    line = f"Tools: ran {len(facts)} lookups -> {len(facts)} facts"
     if skipped:
-        line += f"; skipped {skipped} (unknown ticker, section, class or missing arguments)"
+        line += f"; skipped {skipped} (unknown ticker, class or missing arguments)"
     return {"facts": facts, "trace": [line]}
 
 
