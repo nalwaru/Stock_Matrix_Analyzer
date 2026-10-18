@@ -117,3 +117,22 @@ def test_injection_in_passage_is_passed_as_tool_data_only():
     assert "Ignore previous instructions" in tool_msg["content"]
     assert "untrusted" in AGENT_PROMPT.lower() and "ignore" in AGENT_PROMPT.lower()
     assert not out.get("facts")
+
+
+def test_agent_node_calls_on_step_for_each_tool():
+    from dataclasses import replace
+    steps = []
+    client, deps = deps_with([assistant(tool_calls=[total_call()]), assistant("done")])
+    agent_node(state(), replace(deps, on_step=steps.append))
+    assert len(steps) == 1 and steps[0].startswith("Agent tool: portfolio_calc")
+
+
+def test_on_step_exception_is_ignored():
+    from dataclasses import replace
+
+    def broken(line):
+        raise RuntimeError("ui gone")
+
+    client, deps = deps_with([assistant(tool_calls=[total_call()]), assistant("done")])
+    out = agent_node(state(), replace(deps, on_step=broken))
+    assert len(out["facts"]) == 1

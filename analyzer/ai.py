@@ -74,6 +74,15 @@ def is_configured() -> bool:
     return bool(os.getenv("OPENAI_API_KEY"))
 
 
+def disclosure() -> str:
+    recipients = "OpenRouter and OpenAI" if os.getenv("OPENROUTER_API_KEY") and os.getenv("ROUTER_MODEL") else "OpenAI"
+    return (
+        "Ask about the current filtered portfolio. Holdings, values, matching SEC filing "
+        f"passages and live prices, plus your questions, are sent to {recipients}. "
+        "Educational analysis, not financial advice."
+    )
+
+
 def get_model() -> str:
     return os.getenv("OPENAI_MODEL") or DEFAULT_MODEL
 

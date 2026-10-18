@@ -39,3 +39,19 @@ def test_deps_use_indexed_tickers_and_namespace(monkeypatch):
     deps = make_deps(lambda: object(), "fixed", pinecone_key="k")
     deps.retrieve("q", ["AAPL"])
     assert seen["ns"] == "fixed" and deps.indexed_tickers == store.INDEXED_TICKERS
+
+
+def test_make_deps_passes_on_step_through():
+    seen = []
+    deps = make_deps(lambda: object(), "semantic", pinecone_key="k", on_step=seen.append)
+    deps.on_step("x")
+    assert seen == ["x"]
+
+
+def test_disclosure_names_openrouter_only_when_configured(monkeypatch):
+    from analyzer.ai import disclosure
+    monkeypatch.setenv("OPENROUTER_API_KEY", "k")
+    monkeypatch.setenv("ROUTER_MODEL", "m")
+    assert "OpenRouter" in disclosure()
+    monkeypatch.delenv("OPENROUTER_API_KEY")
+    assert "OpenRouter" not in disclosure()

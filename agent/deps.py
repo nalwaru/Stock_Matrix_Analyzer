@@ -15,4 +15,5 @@ class Deps:
     holdings: object = None  # enriched holdings DataFrame for the portfolio calculator
     analyst_data: object = None  # YahooData-like adapter for the analysts
     router_client: object = None  # separate client (e.g. OpenRouter) for the router only
+    on_step: Callable[[str], None] | None = None  # live progress lines for the UI
     router_model: str = ""  # when empty the router uses `client` and `model` like every node

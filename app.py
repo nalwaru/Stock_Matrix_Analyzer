@@ -208,11 +208,7 @@ def render_ask_ai(df: pd.DataFrame) -> None:
             "file (see `.env.example`) and restart the app."
         )
         return
-    st.caption(
-        "Ask about the current filtered portfolio. Holdings, values, matching SEC filing "
-        "passages and live prices, plus your questions, are sent to OpenAI. "
-        "Educational analysis, not financial advice."
-    )
+    st.caption(ai.disclosure())
     st.caption("Try: Which holding lost the most? How concentrated am I in crypto?")
     try:
         context = ai.build_context(df)
@@ -263,6 +259,7 @@ def render_ask_ai(df: pd.DataFrame) -> None:
                             pinecone_client, os.getenv("RAG_NAMESPACE", "semantic"),
                             os.getenv("PINECONE_API_KEY", ""),
                             holdings=df, analyst_data=yahoo_data(),
+                            on_step=lambda line: status.caption(markdown_safe(line)),
                         ),
                     ):
                         if node == "done":
@@ -271,6 +268,8 @@ def render_ask_ai(df: pd.DataFrame) -> None:
                         step = agent_graph.NODE_LABELS.get(node, node)
                         status.write(f"Done: {step}")
                         for line in update.get("trace", []):
+                            if node == "agent" and line.startswith("Agent tool:"):
+                                continue  # already shown live through on_step
                             status.caption(markdown_safe(line))
                         status.update(label=f"Working... (last step: {step.lower()})")
                 except Exception:  # noqa: BLE001 - run_stream never raises; last-resort guard

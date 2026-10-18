@@ -24,6 +24,15 @@ AGENT_PROMPT = (
 )
 
 
+def _step(deps: Deps, line: str) -> None:
+    if deps.on_step is None:
+        return
+    try:
+        deps.on_step(line)
+    except Exception:  # noqa: BLE001 - a UI callback must never break the agent
+        pass
+
+
 def _merge(acc: dict, update: dict) -> None:
     for key in ("facts", "charts", "trace"):
         acc[key] = acc.get(key, []) + list(update.get(key, []))
@@ -98,8 +107,9 @@ def agent_node(state: AgentState, deps: Deps) -> dict:
                     start = time.perf_counter()
                     update = run_tool(name, args, work, deps)
                     elapsed = time.perf_counter() - start
-                    acc["trace"].append(
-                        f"Agent tool: {name}({json.dumps(args, sort_keys=True)}) {elapsed:.1f}s")
+                    line = f"Agent tool: {name}({json.dumps(args, sort_keys=True)}) {elapsed:.1f}s"
+                    acc["trace"].append(line)
+                    _step(deps, line)
                     _merge(acc, update)
                     analysts_ran = analysts_ran or (name == "run_analysts" and bool(update.get("facts")))
                     content = update["observation"]
@@ -108,7 +118,9 @@ def agent_node(state: AgentState, deps: Deps) -> dict:
     if route.wants_outlook and not analysts_ran:
         for ticker in route.tickers[:MAX_OUTLOOK_TICKERS]:
             update = run_tool("run_analysts", {"ticker": ticker, "kinds": ALL_KINDS}, work, deps)
-            acc["trace"].append(f"Agent tool: run_analysts({ticker}, all kinds; required for an outlook)")
+            line = f"Agent tool: run_analysts({ticker}, all kinds; required for an outlook)"
+            acc["trace"].append(line)
+            _step(deps, line)
             _merge(acc, update)
 
     acc["step_limit_hit"] = limit_hit or exhausted
