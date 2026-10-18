@@ -29,6 +29,9 @@ class AgentState(TypedDict, total=False):
     passages: list
     graded: list
     rewrites: int
+    tickers: list[str]  # resolved by the gate; the agent's default scope
+    step_limit_hit: bool
+    searched_filings: bool
     quotes: dict[str, Quote]
     memo: object  # schemas.Memo
     facts: Annotated[list[Fact], operator.add]  # tool results; nodes append

@@ -12,6 +12,8 @@ class RouteDecision(BaseModel):
     tickers: list[str]
     reason: str
     analyses: list[Analysis] = []
+    wants_outlook: bool = False
+    declined_part: str = ""
 
 
 class PassageGrade(BaseModel):
