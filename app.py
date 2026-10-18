@@ -183,8 +183,13 @@ def yahoo_data():
     return YahooData()
 
 
+USER_AVATAR = "\U0001F4BC"  # briefcase
+ASSISTANT_AVATAR = "\U0001F4C8"  # chart increasing
+AVATARS = {"user": USER_AVATAR, "assistant": ASSISTANT_AVATAR}
+
+
 def render_message(msg: dict) -> None:
-    with st.chat_message(msg["role"]):
+    with st.chat_message(msg["role"], avatar=AVATARS[msg["role"]]):
         st.markdown(markdown_safe(msg["content"]))
         for figure in msg.get("charts", []):
             st.plotly_chart(figure, width="stretch")
@@ -247,11 +252,14 @@ def render_ask_ai(df: pd.DataFrame) -> None:
     if question:
         result = None
         with live.container():
-            with st.chat_message("user"):
+            with st.chat_message("user", avatar=USER_AVATAR):
                 st.markdown(question)
-            with st.chat_message("assistant"):
-                st.markdown(loading.money_bag_html(), unsafe_allow_html=True)
-                status = st.status("Routing your question...", expanded=True)
+            with st.chat_message("assistant", avatar=ASSISTANT_AVATAR):
+                bag_col, status_col = st.columns([1, 5], vertical_alignment="center")
+                with bag_col:
+                    st.markdown(loading.money_bag_html(), unsafe_allow_html=True)
+                with status_col:
+                    status = st.status("Routing your question...", expanded=True)
                 try:
                     for node, update in agent_graph.run_stream(
                         question, list(chat), context, list(df["Ticker"].unique()),
