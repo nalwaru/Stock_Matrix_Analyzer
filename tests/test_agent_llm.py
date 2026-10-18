@@ -72,3 +72,25 @@ def test_schemas_validate_routes_and_fields():
     assert GradeResult(grades=[PassageGrade(id="a", relevant=True, reason="r")]).grades[0].relevant
     assert RewriteResult(query="q").query == "q"
     assert Memo(answer="a", key_figures=[], sources=[], unverified=[]).answer == "a"
+
+
+def test_chat_with_tools_returns_message_and_passes_tools():
+    from tests.agent_fakes import ScriptedToolClient, assistant
+    client = ScriptedToolClient([assistant("done")])
+    tools = [{"type": "function", "function": {"name": "t", "parameters": {}}}]
+    message = llm.chat_with_tools(MESSAGES, tools, "m", client=client)
+    assert message.content == "done"
+    assert client.calls[0]["tools"] == tools and client.calls[0]["temperature"] == 0
+
+
+def test_chat_with_tools_maps_openai_errors_to_aierror():
+    from tests.agent_fakes import ScriptedToolClient
+    error = openai.APIConnectionError(request=NS())
+    with pytest.raises(ai.AIError):
+        llm.chat_with_tools(MESSAGES, [], "m", client=ScriptedToolClient([error]))
+
+
+def test_chat_with_tools_requires_key_when_no_client(monkeypatch):
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    with pytest.raises(ai.AIError):
+        llm.chat_with_tools(MESSAGES, [], "m")

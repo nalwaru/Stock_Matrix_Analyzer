@@ -37,3 +37,28 @@ def make_deps(client=None, retrieve=None, quotes=None, indexed=("AAPL",), holdin
         indexed_tickers=list(indexed),
         holdings=holdings, analyst_data=analyst_data,
     )
+
+
+def tool_call(call_id: str, name: str, args: dict):
+    import json
+    return NS(id=call_id, type="function", function=NS(name=name, arguments=json.dumps(args)))
+
+
+def assistant(content=None, tool_calls=()):
+    return NS(role="assistant", content=content, tool_calls=list(tool_calls) or None)
+
+
+class ScriptedToolClient:
+    """create() returns the next scripted assistant message (an Exception is raised instead)."""
+
+    def __init__(self, turns):
+        self.turns = list(turns)
+        self.calls = []
+        self.chat = NS(completions=NS(create=self._create))
+
+    def _create(self, **kwargs):
+        self.calls.append({**kwargs, "messages": list(kwargs["messages"])})
+        turn = self.turns.pop(0)
+        if isinstance(turn, Exception):
+            raise turn
+        return NS(choices=[NS(message=turn)])
