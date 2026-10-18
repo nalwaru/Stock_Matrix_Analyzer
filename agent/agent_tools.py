@@ -1,5 +1,6 @@
 """Tools the agent can call. Each wraps an existing node or calculator and returns a partial
 state update plus `observation`, the text the model sees. Nothing here raises."""
+import re
 from typing import Literal
 
 from pydantic import BaseModel, ValidationError
@@ -14,6 +15,11 @@ from agent.tools.portfolio import run_calc
 from analyzer import ai
 
 MAX_FILING_REWRITES = 1
+
+
+_TECHNICAL_ASKED = re.compile(
+    r"technical|chart|\brsi\b|macd|moving average|\bsma\b|\bema\b|bollinger|overbought|oversold|"
+    r"trend|momentum|support|resistance|candle|indicator", re.IGNORECASE)
 
 
 class SearchFilingsArgs(BaseModel):
@@ -98,8 +104,13 @@ def _portfolio_calc(args: CalcCall, state: AgentState, deps: Deps) -> dict:
 
 
 def _run_analysts(args: RunAnalystsArgs, state: AgentState, deps: Deps) -> dict:
+    kinds = [k for k in args.kinds if k != "technical" or _TECHNICAL_ASKED.search(state.get("question", ""))]
+    if not kinds:
+        return {"observation": "The technical analysis (and chart) is only run when the question "
+                               "explicitly asks for it, so it was skipped.",
+                "facts": [], "charts": [], "trace": ["run_analysts: technical skipped (not asked for)"]}
     work = {**state, "route": RouteDecision(route="agent", tickers=[args.ticker.strip().upper()],
-                                            reason="tool"), "analyses": list(args.kinds)}
+                                            reason="tool"), "analyses": kinds}
     out = analysis_node(work, deps)
     facts = out.get("facts", [])
     return {"facts": facts, "charts": out.get("charts", []), "trace": out.get("trace", []),

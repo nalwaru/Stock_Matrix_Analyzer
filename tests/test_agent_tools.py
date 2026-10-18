@@ -56,9 +56,10 @@ def test_portfolio_calc_without_holdings_is_unavailable():
     assert "no portfolio is loaded" in out["observation"].lower() and not out.get("facts")
 
 
-def test_run_analysts_returns_facts_and_charts():
+def test_run_analysts_returns_facts_and_charts_when_technical_is_asked_for():
     deps = make_deps(analyst_data=FakeData())
-    out = run_tool("run_analysts", {"ticker": "NVDA", "kinds": ["technical"]}, STATE, deps)
+    state = {**STATE, "question": "Is NVDA overbought?"}
+    out = run_tool("run_analysts", {"ticker": "NVDA", "kinds": ["technical"]}, state, deps)
     assert out["facts"] and out["charts"] and "NVDA technical" in out["observation"]
 
 
@@ -80,3 +81,20 @@ def test_invalid_argument_error_names_the_allowed_values():
     out = run_tool("run_analysts", {"ticker": "AAPL", "kinds": ["growth"]}, STATE, make_deps())
     text = out["observation"]
     assert text.startswith("Tool error:") and "technical" in text and "ownership" in text
+
+
+def test_technical_kind_is_dropped_unless_the_question_asks_for_it():
+    deps = make_deps(analyst_data=FakeData())
+    state = {**STATE, "question": "Oracle outlook?"}
+    out = run_tool("run_analysts", {"ticker": "NVDA", "kinds": ["technical", "fundamental"]}, state, deps)
+    assert not out["charts"]
+    assert all("technical" not in f.label for f in out["facts"]) and out["facts"]
+    only = run_tool("run_analysts", {"ticker": "NVDA", "kinds": ["technical"]}, state, deps)
+    assert not only["charts"] and not only["facts"] and "technical" in only["observation"].lower()
+
+
+def test_technical_keywords_unlock_the_chart():
+    deps = make_deps(analyst_data=FakeData())
+    for question in ("Show me the technical chart for NVDA", "What is NVDA's RSI?", "NVDA moving averages?"):
+        out = run_tool("run_analysts", {"ticker": "NVDA", "kinds": ["technical"]}, {**STATE, "question": question}, deps)
+        assert out["charts"], question

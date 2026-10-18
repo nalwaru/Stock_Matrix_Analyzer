@@ -133,5 +133,5 @@ def test_stream_collects_charts_from_the_analysis_node():
     client = with_tools(
         ScriptedClient(RouteDecision=d, Memo=Memo(answer="ok", key_figures=[], sources=[], unverified=[])),
         [assistant(tool_calls=[analysts]), assistant("done")])
-    final = list(run_stream("q", [], "{}", ["NVDA"], make_deps(client, analyst_data=FakeData())))[-1][1]
+    final = list(run_stream("Show the technical chart for NVDA", [], "{}", ["NVDA"], make_deps(client, analyst_data=FakeData())))[-1][1]
     assert len(final["charts"]) == 1

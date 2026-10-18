@@ -138,3 +138,18 @@ def test_agent_stopped_early_is_flagged():
 def test_outlook_section_carries_a_not_a_financial_advisor_line():
     md = render_memo(memo(outlook=[f"P/E is 30.0 [{PE}]"], leaning="neutral"))
     assert "not a financial advisor" in md.lower()
+
+
+def test_outlook_answer_skips_filing_availability_notes():
+    out = run(memo(outlook=[f"P/E is 30.0 [{PE}]"], leaning="neutral"), no_filings=["ORCL"],
+              graded=[], searched_filings=True)
+    assert out.outlook_leaning == "neutral"
+    assert not any("filing" in u.lower() for u in out.unverified)
+
+
+def test_filing_note_appears_once_when_the_answer_needs_filings():
+    out = run(memo(), outlook=False, no_filings=["ORCL"], graded=[], searched_filings=True)
+    notes = [u for u in out.unverified if "filing" in u.lower()]
+    assert notes == ["No SEC filings are available for ORCL"]
+    assert "No SEC filings are available" not in render_memo(out).split("### What I couldn't verify")[0]
+    assert render_memo(out).count("No SEC filings are available for ORCL") == 1

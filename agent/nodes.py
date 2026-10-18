@@ -372,13 +372,15 @@ def synthesize_node(state: AgentState, deps: Deps) -> dict:
         for n in check_numbers([memo.answer, *memo.key_figures, *outlook], evidence)
     ]
     unverified += [f"Live price for {t} was unavailable" for t, q in quotes.items() if q.price is None]
-    if route == "agent" and state.get("searched_filings") and not graded:
-        unverified.append("No relevant SEC filing passages were found")
     leaning = memo.outlook_leaning if outlook else ""
     if decision.wants_outlook and not leaning:
         outlook = []
         unverified.append("The analyst data was insufficient to give an outlook")
-    unverified += [f"No SEC filings are available for {t}" for t in state.get("no_filings", [])]
+    if not (decision.wants_outlook and leaning):  # an analyst-based outlook does not need filings
+        missing = list(state.get("no_filings", []))
+        unverified += [f"No SEC filings are available for {t}" for t in missing]
+        if route == "agent" and state.get("searched_filings") and not graded and not missing:
+            unverified.append("No relevant SEC filing passages were found")
     if state.get("agent_stopped_early"):
         unverified.append("The agent stopped early because a model call failed, so evidence may be incomplete")
     if state.get("step_limit_hit"):
@@ -386,7 +388,7 @@ def synthesize_node(state: AgentState, deps: Deps) -> dict:
     return {
         "memo": Memo(answer=memo.answer, key_figures=memo.key_figures, sources=memo.sources,
                      unverified=unverified, outlook=outlook, outlook_leaning=leaning,
-                     declined=decision.declined_part, no_filings=list(state.get("no_filings", []))),
+                     declined=decision.declined_part),
         "trace": ["Synthesizer: memo written from supplied evidence"],
     }
 
