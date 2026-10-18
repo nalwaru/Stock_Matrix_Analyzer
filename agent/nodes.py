@@ -7,6 +7,7 @@ from agent.memo import check_numbers, idk_memo, labels_for, passage_label, quote
 from agent.schemas import GradeResult, Memo, RewriteResult, RouteDecision, ToolPlan
 from agent.state import AgentState, Fact
 from agent.analysts.data import BENCHMARK
+from agent.charts import technical_figure
 from agent.analysts.fundamental import analyze_fundamental
 from agent.analysts.ownership import analyze_ownership
 from agent.analysts.risk import analyze_risk
@@ -252,12 +253,16 @@ def analysis_node(state: AgentState, deps: Deps) -> dict:
     tickers = (route.tickers or held)[:MAX_ANALYSIS_TICKERS]
     wanted = route.analyses or ALL_ANALYSES
     today = _today()
-    facts, trace = [], []
+    facts, trace, charts = [], [], []
     for ticker in tickers:
         for name in wanted:
             try:
                 if name == "technical":
-                    found = analyze_technical(ticker, data.history(ticker, "2y"), today)
+                    history = data.history(ticker, "2y")
+                    found = analyze_technical(ticker, history, today)
+                    figure = technical_figure(ticker, history)
+                    if figure is not None:
+                        charts.append(figure)
                 elif name == "risk":
                     others = {o: data.history(o, "1y") for o in held if o != ticker}
                     found = analyze_risk(ticker, data.history(ticker, "3y"),
@@ -275,7 +280,7 @@ def analysis_node(state: AgentState, deps: Deps) -> dict:
             trace.append(f"{name.capitalize()} analyst {ticker}: {len(found)} facts"
                          + (f", {missing} unavailable" if missing else ""))
             facts += found
-    return {"facts": facts, "trace": trace}
+    return {"facts": facts, "trace": trace, "charts": charts}
 
 
 def price_node(state: AgentState, deps: Deps) -> dict:

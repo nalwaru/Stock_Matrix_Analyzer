@@ -31,4 +31,5 @@ class AgentState(TypedDict, total=False):
     quotes: dict[str, Quote]
     memo: object  # schemas.Memo
     facts: Annotated[list[Fact], operator.add]  # tool results; nodes append
+    charts: Annotated[list, operator.add]  # plotly figures built by analysts
     trace: Annotated[list[str], operator.add]  # nodes append; the graph concatenates

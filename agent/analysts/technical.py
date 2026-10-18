@@ -105,3 +105,26 @@ def analyze_technical(ticker: str, history: pd.DataFrame, today: str) -> list[Fa
     else:
         add("SUPPORT_RESISTANCE", None, "needs High/Low and 60 sessions")
     return out
+
+
+def indicator_frame(history: pd.DataFrame) -> pd.DataFrame:
+    """Per-session indicator series for charting; blank until enough history exists.
+
+    Uses the same formulas as analyze_technical, so the chart and the facts agree."""
+    close = history["Close"]
+    out = pd.DataFrame({"Close": close})
+    for w in (20, 50, 200):
+        out[f"SMA{w}"] = close.rolling(w).mean()
+    mid, std = close.rolling(20).mean(), close.rolling(20).std(ddof=0)
+    out["BB_UP"], out["BB_LOW"] = mid + 2 * std, mid - 2 * std
+    delta = close.diff()
+    gain, loss = _wilder(delta.clip(lower=0), 14), _wilder(-delta.clip(upper=0), 14)
+    rsi = 100 - 100 / (1 + gain / loss.where(loss != 0))
+    rsi[(loss == 0) & (gain > 0)] = 100.0
+    out["RSI14"] = rsi
+    macd = close.ewm(span=12, adjust=False).mean() - close.ewm(span=26, adjust=False).mean()
+    out["MACD"] = macd.where(close.expanding().count() >= 35)
+    out["MACD_SIGNAL"] = macd.ewm(span=9, adjust=False).mean().where(close.expanding().count() >= 35)
+    out["MACD_HIST"] = out["MACD"] - out["MACD_SIGNAL"]
+    out["Volume"] = history["Volume"] if "Volume" in history else float("nan")
+    return out

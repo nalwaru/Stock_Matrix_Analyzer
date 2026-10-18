@@ -124,3 +124,15 @@ def test_chat_history_resets_when_filters_change(monkeypatch):
     assert any("Because of the 8-K" in m.value for m in at.markdown)
     at.sidebar.multiselect[0].set_value(["Stocks"]).run()
     assert not any("Because of the 8-K" in m.value for m in at.markdown)
+
+
+def test_charts_from_the_agent_are_rendered_and_dollars_are_escaped(monkeypatch):
+    import plotly.graph_objects as go
+
+    fig = go.Figure(go.Scatter(x=[1, 2], y=[1, 2], name="Close"))
+    state = _state(answer="Price is $343.46 and the 50-day SMA is $325.69 [AAPL technical, 2026-10-18, SMA50].")
+    state["charts"] = [fig]
+    at = _ask_ai_app(monkeypatch, lambda *a, **k: state)
+    assert not at.exception
+    assert len(at.get("plotly_chart")) >= 1
+    assert any(r"\$343.46" in m.value for m in at.markdown)

@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 from analyzer import ai, export, market, portfolio, scenarios, schema
 from agent import graph as agent_graph
 from agent import wiring as agent_wiring
-from agent.memo import idk_memo, render_memo
+from agent.memo import idk_memo, markdown_safe, render_memo
 
 load_dotenv()
 
@@ -186,16 +186,19 @@ def yahoo_data():
 
 def render_message(msg: dict) -> None:
     with st.chat_message(msg["role"]):
-        st.markdown(msg["content"])
+        st.markdown(markdown_safe(msg["content"]))
+        for figure in msg.get("charts", []):
+            st.plotly_chart(figure, width="stretch")
         if msg.get("sources"):
             with st.expander("Sources"):
                 for p in msg["sources"]:
-                    st.markdown(f"**[{p.ticker} {p.form}, {p.filing_date}, {p.section}]** ({p.source_url})")
-                    st.caption(p.text[:600])
+                    st.markdown(markdown_safe(
+                        f"**[{p.ticker} {p.form}, {p.filing_date}, {p.section}]** ({p.source_url})"))
+                    st.caption(markdown_safe(p.text[:600]))
         if msg.get("trace"):
             with st.expander("Agent trace"):
                 for line in msg["trace"]:
-                    st.markdown(f"- {line}")
+                    st.markdown(f"- {markdown_safe(line)}")
 
 
 def render_ask_ai(df: pd.DataFrame) -> None:
@@ -268,7 +271,7 @@ def render_ask_ai(df: pd.DataFrame) -> None:
                         step = agent_graph.NODE_LABELS.get(node, node)
                         status.write(f"Done: {step}")
                         for line in update.get("trace", []):
-                            status.caption(line)
+                            status.caption(markdown_safe(line))
                         status.update(label=f"Working... (last step: {step.lower()})")
                 except Exception:  # noqa: BLE001 - run_stream never raises; last-resort guard
                     result = None
@@ -279,7 +282,8 @@ def render_ask_ai(df: pd.DataFrame) -> None:
         chat += [
             {"role": "user", "content": question},
             {"role": "assistant", "content": render_memo(result["memo"]),
-             "sources": result.get("graded", []), "trace": result.get("trace", [])},
+             "sources": result.get("graded", []), "trace": result.get("trace", []),
+             "charts": result.get("charts", [])},
         ]
         st.session_state["chat"] = chat = chat[-2 * ai.MAX_CHAT_TURNS:]
     for i in range(len(chat) - 2, -1, -2):

@@ -76,7 +76,7 @@ def run_stream(question: str, history: list[dict], portfolio_json: str,
             for node, update in chunk.items():
                 update = update or {}
                 for key, value in update.items():
-                    state[key] = state.get(key, []) + value if key in ("trace", "facts") else value
+                    state[key] = state.get(key, []) + value if key in ("trace", "facts", "charts") else value
                 yield node, update
     except Exception as exc:  # noqa: BLE001 - the tab must never crash
         state["memo"] = idk_memo()

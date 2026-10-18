@@ -101,3 +101,30 @@ def test_yahoo_adapter_never_raises_when_yfinance_fails():
     assert data.upgrades("AAPL") == [] and data.holders("AAPL") == []
     assert data.insiders("AAPL") == [] and data.calendar("AAPL") == {}
     assert data.closes("AAPL").empty
+
+
+def test_technical_analysis_returns_a_chart_other_analyses_do_not():
+    out = analysis_node(state(["technical"]), make_deps(analyst_data=FakeData()))
+    assert len(out["charts"]) == 1 and out["charts"][0].layout.title.text.startswith("NVDA")
+    other = analysis_node(state(["fundamental", "ownership"]), make_deps(analyst_data=FakeData()))
+    assert other.get("charts", []) == []
+
+
+def test_no_chart_when_history_is_too_short():
+    class Short(FakeData):
+        def history(self, ticker, period="2y"):
+            return hist(10)
+
+    out = analysis_node(state(["technical"]), make_deps(analyst_data=Short()))
+    assert out.get("charts", []) == [] and out["facts"]
+
+
+def test_stream_collects_charts_from_the_analysis_node():
+    from agent.graph import run_stream
+    from agent.schemas import Memo, RouteDecision
+    from tests.agent_fakes import ScriptedClient
+
+    d = RouteDecision(route="analysis", tickers=["NVDA"], reason="r", analyses=["technical"])
+    client = ScriptedClient(RouteDecision=d, Memo=Memo(answer="ok", key_figures=[], sources=[], unverified=[]))
+    final = list(run_stream("q", [], "{}", ["NVDA"], make_deps(client, analyst_data=FakeData())))[-1][1]
+    assert len(final["charts"]) == 1

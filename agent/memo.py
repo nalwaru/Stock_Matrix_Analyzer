@@ -73,3 +73,8 @@ def check_numbers(texts: list[str], evidence: str) -> list[str]:
                        for scale in _SCALES):
                 missing.append(token)
     return missing
+
+
+def markdown_safe(text: str) -> str:
+    """Escape dollar signs so Streamlit does not treat '$...$' as LaTeX."""
+    return re.sub(r"(?<!\\)\$", r"\\$", text)
