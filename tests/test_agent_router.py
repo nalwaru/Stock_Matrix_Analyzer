@@ -162,3 +162,35 @@ def test_long_reasons_are_capped_in_the_trace_at_a_word_boundary():
 def test_short_reasons_are_left_alone():
     out = router_node(state(), deps(FakeClient(decision("agent", ["AAPL"], reason="Filings question."))))
     assert out["trace"][0].startswith("Router: agent (Filings question.)")
+
+
+def named(route, company, tickers=()):
+    return RouteDecision(route=route, tickers=list(tickers), reason="r", named_company=company)
+
+
+def test_unmappable_company_name_is_refused_in_code_even_when_the_gate_says_portfolio_only():
+    out = router_node(state("Vivian profit or loss?"), deps(FakeClient(named("portfolio_only", "Vivian"))))
+    assert out["route"].route == "out_of_scope" and route_after_router(out) == "refuse"
+    assert "Vivian" in out["route"].declined_part and "unknown company" in out["route"].declined_part
+    assert out["route"].tickers == []
+
+
+def test_the_guard_applies_to_every_route_not_just_portfolio_only():
+    for route in ("agent", "live_price"):
+        out = router_node(state("Vivian price"), deps(FakeClient(named(route, "Vivian"))))
+        assert out["route"].route == "out_of_scope", route
+
+
+def test_a_named_company_with_a_ticker_is_untouched():
+    out = router_node(state("Apple profit"), deps(FakeClient(named("agent", "Apple", ["AAPL"]))))
+    assert out["route"].route == "agent" and out["route"].tickers == ["AAPL"]
+
+
+def test_no_named_company_leaves_portfolio_questions_alone():
+    out = router_node(state("What if crypto falls 30%?"), deps(FakeClient(named("portfolio_only", ""))))
+    assert out["route"].route == "portfolio_only"
+
+
+def test_router_prompt_asks_for_the_company_name_as_written():
+    from agent.nodes import ROUTER_PROMPT
+    assert "named_company" in ROUTER_PROMPT

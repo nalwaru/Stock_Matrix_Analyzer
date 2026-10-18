@@ -114,3 +114,9 @@ def test_refuse_node_states_the_declined_part():
 def test_router_prompt_declines_news_requests_with_a_clear_reason():
     from agent.nodes import ROUTER_PROMPT
     assert "news" in ROUTER_PROMPT.lower() and "no news source" in ROUTER_PROMPT.lower()
+
+
+def test_writer_prompt_forbids_attaching_portfolio_wide_figures_to_a_named_company():
+    from agent.nodes import SYNTH_PROMPT
+    text = SYNTH_PROMPT.lower()
+    assert "whole portfolio" in text and "never attribute" in text

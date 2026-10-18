@@ -13,6 +13,7 @@ class RouteDecision(BaseModel):
     reason: str
     wants_outlook: bool = False
     about_filings: bool = False
+    named_company: str = ""  # a company or stock name as written in the question; empty if none
     declined_part: str = ""
 
 

@@ -43,3 +43,5 @@
 {"question": "Apple news and its P/E ratio", "expected_route": "agent", "expected_tickers": ["AAPL"], "expected_declined": true}
 {"question": "latest 10-K from apple", "expected_route": "agent", "expected_tickers": ["AAPL"], "expected_about_filings": true}
 {"question": "What did Apple's 10-Q say about legal proceedings?", "expected_route": "agent", "expected_tickers": ["AAPL"], "expected_about_filings": true}
+{"question": "Vivian profit or loss?", "expected_route": "out_of_scope", "expected_declined": true}
+{"question": "rivian profit or loss?", "expected_route": "agent", "expected_tickers": ["RIVN"], "expected_about_filings": true}

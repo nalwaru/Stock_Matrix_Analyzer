@@ -33,3 +33,25 @@ def test_ticker_misses_lists_wrong_or_missing_tickers():
 def test_some_cases_pin_the_resolved_ticker_for_company_names_and_typos():
     cases = [c for c in load_cases(CASES_PATH) if c.get("expected_tickers")]
     assert any(c["expected_tickers"] == ["ORCL"] for c in cases)
+
+
+def test_each_check_asks_the_gate_once_so_flaky_answers_cannot_contradict_the_report():
+    from agent.eval.run_router_eval import flag_misses, ticker_misses
+    calls = []
+
+    def flaky_flag(q):
+        calls.append(q)
+        return len(calls) % 2 == 0  # first call False, second True
+
+    cases = [{"question": "a", "expected_route": "agent", "expected_declined": True}]
+    out = flag_misses(cases, "expected_declined", flaky_flag)
+    assert len(calls) == 1 and out == [("a", True, False)]
+
+    tcalls = []
+
+    def flaky_tickers(q):
+        tcalls.append(q)
+        return ["X"] if len(tcalls) == 1 else ["AAPL"]
+
+    out = ticker_misses([{"question": "b", "expected_route": "agent", "expected_tickers": ["AAPL"]}], flaky_tickers)
+    assert len(tcalls) == 1 and out == [("b", ["AAPL"], ["X"])]

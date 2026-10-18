@@ -28,15 +28,24 @@ def ticker_misses(cases: list[dict], decide_tickers: Callable[[str], list[str]])
     misses = []
     for case in cases:
         want = case.get("expected_tickers")
-        if want is not None and decide_tickers(case["question"]) != want:
-            misses.append((case["question"], want, decide_tickers(case["question"])))
+        if want is None:
+            continue
+        got = decide_tickers(case["question"])  # asked once: the gate can answer differently each call
+        if got != want:
+            misses.append((case["question"], want, got))
     return misses
 
 
 def flag_misses(cases: list[dict], key: str, decide_flag: Callable[[str], bool]) -> list[tuple]:
     """Cases that pin a boolean `key` (expected_wants_outlook / expected_declined) the router got wrong."""
-    return [(c["question"], c[key], decide_flag(c["question"])) for c in cases
-            if key in c and decide_flag(c["question"]) != c[key]]
+    misses = []
+    for case in cases:
+        if key not in case:
+            continue
+        got = decide_flag(case["question"])  # asked once: the gate can answer differently each call
+        if got != case[key]:
+            misses.append((case["question"], case[key], got))
+    return misses
 
 
 def main() -> int:

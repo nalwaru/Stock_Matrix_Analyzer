@@ -39,6 +39,9 @@ ROUTER_PROMPT = (
     "way set declined_part to exactly: recent news (no news source here; only SEC filings, "
     "analyst data and prices). A question about the latest results, filings or earnings is "
     "answerable and is not a news request.\n"
+    "Set named_company to the company or stock name exactly as the user wrote it (for example "
+    "'Vivian' or 'Apple'); leave it empty when the question names no company, including "
+    "questions about asset classes, sectors or the whole portfolio.\n"
     "Set about_filings true when the question is about the content or the existence of SEC "
     "filings (10-K, 10-Q, 8-K, annual or quarterly reports): their results, risks, business, "
     "legal matters, or which filing is the latest; otherwise false. Such questions search the "
@@ -115,6 +118,13 @@ def router_node(state: AgentState, deps: Deps) -> dict:
 
     route = decision.route
     tickers = list(dict.fromkeys(t.strip().upper() for t in decision.tickers if t.strip()))
+    declined_part = decision.declined_part
+    guard = ""
+    if route != "out_of_scope" and decision.named_company.strip() and not tickers:
+        # a company name with no real ticker must never fall through to the holdings or calculator
+        route, tickers = "out_of_scope", []
+        declined_part = f"unknown company ({decision.named_company.strip()})"
+        guard = "; refused: the company name could not be mapped to a ticker"
     if not tickers:
         if route == "live_price":
             tickers = held
@@ -127,13 +137,15 @@ def router_node(state: AgentState, deps: Deps) -> dict:
         line += "; filings first"
     if decision.wants_outlook:
         line += "; outlook requested"
-    if decision.declined_part:
-        line += f"; will not answer: {decision.declined_part}"
+    line += guard
+    if declined_part:
+        line += f"; will not answer: {declined_part}"
     return {
         "route": RouteDecision(route=route, tickers=tickers, reason=decision.reason,
                                wants_outlook=decision.wants_outlook,
                                about_filings=decision.about_filings,
-                               declined_part=decision.declined_part),
+                               named_company=decision.named_company,
+                               declined_part=declined_part),
         "tickers": tickers,
         "trace": [line],
     }
@@ -327,7 +339,11 @@ SYNTH_PROMPT = (
     "key_figures (each as 'Name: value [label]'), sources (the labels you used), "
     "unverified (anything asked that the supplied data does not show). If the supplied "
     f"data does not contain the answer, set answer to exactly: {ai.IDK_MESSAGE} "
-    "This is educational analysis, not financial advice. "
+    "Portfolio figures (the portfolio JSON and [PORTFOLIO calc, ...] facts) describe the whole "
+    "portfolio or its own holdings: never attribute them to a company the question names unless "
+    "that company's own holding or filing fact is supplied; if no supplied fact is about the named "
+    "company, say you do not know. "
+"This is educational analysis, not financial advice. "
     "If the evidence block says an outlook was requested, also fill outlook_leaning "
     "(positive, neutral or cautious) and outlook: three or four short reasons about the "
     "company's business, each ending with one bracketed label copied exactly from a computed "
