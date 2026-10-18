@@ -25,14 +25,6 @@ class FakeClient:
         return NS(choices=[NS(message=NS(content=self._text))])
 
 
-def test_audit_messages_have_cfa_persona_and_summary_only():
-    msgs = ai.build_audit_messages(SUMMARY)
-    assert msgs[0]["role"] == "system"
-    assert "Certified Financial Analyst" in msgs[0]["content"]
-    assert "bullet" in msgs[0]["content"].lower()
-    assert SUMMARY in msgs[1]["content"]
-
-
 def test_chat_messages_prepend_current_portfolio_and_trim_history():
     history = []
     for i in range(10):
@@ -43,13 +35,6 @@ def test_chat_messages_prepend_current_portfolio_and_trim_history():
     assert msgs[-1] == {"role": "user", "content": "new question"}
 
 
-def test_generate_audit_uses_model_and_returns_stripped_text():
-    client = FakeClient(text="  Summary\n- Action  ")
-    out = ai.generate_audit(SUMMARY, "test-model", client=client)
-    assert out == "Summary\n- Action"
-    assert client.calls[0]["model"] == "test-model"
-
-
 def test_chat_reply_returns_text():
     client = FakeClient(text="Tech is 60%.")
     assert ai.chat_reply(SUMMARY, [], "tech exposure?", "m", client=client) == "Tech is 60%."
@@ -58,20 +43,20 @@ def test_chat_reply_returns_text():
 def test_openai_error_is_wrapped_in_aierror():
     client = FakeClient(error=openai.OpenAIError("secret provider detail"))
     with pytest.raises(ai.AIError, match="could not complete") as exc:
-        ai.generate_audit(SUMMARY, "m", client=client)
+        ai.chat_reply(SUMMARY, [], "q", "m", client=client)
     assert "secret" not in str(exc.value)
 
 
 def test_empty_response_raises_aierror():
     with pytest.raises(ai.AIError):
-        ai.generate_audit(SUMMARY, "m", client=FakeClient(text=""))
+        ai.chat_reply(SUMMARY, [], "q", "m", client=FakeClient(text=""))
 
 
 def test_missing_api_key_raises_aierror_and_is_not_configured(monkeypatch):
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     assert ai.is_configured() is False
     with pytest.raises(ai.AIError, match="OPENAI_API_KEY"):
-        ai.generate_audit(SUMMARY, "m")
+        ai.chat_reply(SUMMARY, [], "q", "m")
 
 
 def test_model_comes_from_env_with_default(monkeypatch):
@@ -79,10 +64,6 @@ def test_model_comes_from_env_with_default(monkeypatch):
     assert ai.get_model() == ai.DEFAULT_MODEL
     monkeypatch.setenv("OPENAI_MODEL", "custom")
     assert ai.get_model() == "custom"
-
-
-def test_audit_is_streamlit_cached():
-    assert hasattr(ai.audit, "clear")
 
 
 def holdings(n=3):
@@ -209,3 +190,8 @@ def test_safe_error_names_exhausted_credits_without_blaming_openai():
     exc = openai.APIStatusError("credits", response=response, body=None)
     message = str(ai.safe_error(exc))
     assert "credits" in message.lower() and "OpenAI could not" not in message
+
+
+def test_the_audit_feature_is_gone():
+    for name in ("AUDIT_SYSTEM_PROMPT", "build_audit_messages", "generate_audit", "audit"):
+        assert not hasattr(ai, name), name

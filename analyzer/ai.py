@@ -1,10 +1,9 @@
-"""OpenAI integration: portfolio audit and chat. Receives aggregated JSON only."""
+"""OpenAI integration for Ask AI: chat helpers, grounding and safe errors."""
 import json
 import os
 import re
 
 import pandas as pd
-import streamlit as st
 from openai import (
     APIConnectionError,
     AuthenticationError,
@@ -26,14 +25,6 @@ HOLDING_COLUMNS = [
     "Current_Value", "Gain_Loss", "Gain_Loss_Pct", "Day_Change",
 ]
 
-AUDIT_SYSTEM_PROMPT = (
-    "You are a Certified Financial Analyst (CFA) reviewing an investor's portfolio. "
-    "You are given a JSON summary: allocation percentages by asset class, the top 3 "
-    "positions, total value and total ROI. Write an executive summary covering risk "
-    "exposure, concentration, and diversification, then finish with a bulleted list of "
-    "concrete rebalancing action items. Use Markdown. Be concise. This is educational "
-    "analysis, not personalised financial advice."
-)
 IDK_MESSAGE = (
     "I'm sorry, I don't know. I couldn't find that in your portfolio data or in the "
     "SEC filings I have, and I don't want to guess."
@@ -85,13 +76,6 @@ def disclosure() -> str:
 
 def get_model() -> str:
     return os.getenv("OPENAI_MODEL") or DEFAULT_MODEL
-
-
-def build_audit_messages(summary_json: str) -> list[dict]:
-    return [
-        {"role": "system", "content": AUDIT_SYSTEM_PROMPT},
-        {"role": "user", "content": f"Portfolio summary:\n{summary_json}"},
-    ]
 
 
 def _format_passages(passages: list) -> str:
@@ -173,10 +157,6 @@ def _complete(messages: list[dict], model: str, client=None) -> str:
     return text.strip()
 
 
-def generate_audit(summary_json: str, model: str, client=None) -> str:
-    return _complete(build_audit_messages(summary_json), model, client)
-
-
 def grounded(reply: str, labels: set[str]) -> str:
     """Replace a reply that cites a source label that was never supplied."""
     for ticker, form, filed, section in CITATION.findall(reply):
@@ -202,9 +182,3 @@ def chat_reply(
         raise AIError(f"Enter a question between 1 and {MAX_QUESTION} characters.")
     messages = build_chat_messages(summary_json, history, question, passages=passages)
     return _grounded(_complete(messages, model, client), passages)
-
-
-@st.cache_data(show_spinner=False)
-def audit(summary_json: str, model: str) -> str:
-    """Cached by (payload, model); exceptions are never cached."""
-    return generate_audit(summary_json, model)

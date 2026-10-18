@@ -1,6 +1,5 @@
 """Stock Portfolio Analyzer: Streamlit entry point (UI wiring only)."""
 import hashlib
-import json
 import os
 from pathlib import Path
 
@@ -223,21 +222,6 @@ def render_ask_ai(df: pd.DataFrame) -> None:
         st.session_state["chat"] = []
     if st.button("Clear conversation", key="clear_ask_ai"):
         st.session_state["chat"] = []
-
-    payload = json.dumps(portfolio.ai_summary(df), sort_keys=True)
-    if st.button("Generate AI Audit"):
-        try:
-            with st.spinner("Analyzing portfolio..."):
-                st.session_state["audit"] = (payload, ai.audit(payload, ai.get_model()))
-        except ai.AIError as exc:
-            st.error(f"{exc} You can retry.")
-    saved = st.session_state.get("audit")
-    if saved and saved[0] == payload:
-        with st.expander("AI Portfolio Audit", expanded=True):
-            st.markdown(saved[1])
-            st.caption("Educational analysis, not financial advice.")
-    elif saved:
-        st.caption("Your filters changed since the last audit. Generate a new one.")
 
     # Input stays at the top; the conversation renders below it, newest exchange first
     # (each exchange keeps question-then-answer order).
