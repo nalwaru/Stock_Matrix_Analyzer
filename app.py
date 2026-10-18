@@ -253,7 +253,6 @@ def render_ask_ai(df: pd.DataFrame) -> None:
             with st.chat_message("assistant", avatar=ASSISTANT_AVATAR_BUSY):  # transmits while working
                 headline = st.empty()  # plain text: the avatar already shows activity, so no spinner
                 headline.markdown("Working... (starting)")
-                steps = st.expander("Steps", expanded=True)
                 try:
                     for node, update in agent_graph.run_stream(
                         question, list(chat), context, list(df["Ticker"].unique()),
@@ -261,18 +260,12 @@ def render_ask_ai(df: pd.DataFrame) -> None:
                             pinecone_client, os.getenv("RAG_NAMESPACE", "semantic"),
                             os.getenv("PINECONE_API_KEY", ""),
                             holdings=df, analyst_data=yahoo_data(),
-                            on_step=lambda line: steps.caption(markdown_safe(line)),
                         ),
                     ):
                         if node == "done":
                             result = update
                             break
                         step = agent_graph.NODE_LABELS.get(node, node)
-                        steps.write(f"Done: {step}")
-                        for line in update.get("trace", []):
-                            if node == "agent" and line.startswith("Agent tool:"):
-                                continue  # already shown live through on_step
-                            steps.caption(markdown_safe(line))
                         headline.markdown(f"Working... (last step: {step.lower()})")
                 except Exception:  # noqa: BLE001 - run_stream never raises; last-resort guard
                     result = None
