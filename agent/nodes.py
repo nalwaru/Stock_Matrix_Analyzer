@@ -1,7 +1,7 @@
 """Graph nodes. Each takes (state, deps) and returns a partial state update."""
 from agent.deps import Deps
 from agent.llm import ask_structured
-from agent.memo import (check_numbers, idk_memo, labels_for, passage_label, portfolio_label,
+from agent.memo import (cited_reasons, check_numbers, idk_memo, labels_for, passage_label, portfolio_label,
                         quote_label)
 from agent.schemas import GradeResult, Memo, RewriteResult, RouteDecision, ToolPlan
 from agent.state import AgentState, Fact
@@ -296,7 +296,14 @@ SYNTH_PROMPT = (
     "key_figures (each as 'Name: value [label]'), sources (the labels you used), "
     "unverified (anything asked that the supplied data does not show). If the supplied "
     f"data does not contain the answer, set answer to exactly: {ai.IDK_MESSAGE} "
-    "This is educational analysis, not financial advice."
+    "This is educational analysis, not financial advice. "
+    "If the evidence block says an outlook was requested, also fill outlook_leaning "
+    "(positive, neutral or cautious) and outlook: three or four short reasons about the "
+    "company's business, each ending with one bracketed label copied exactly from a computed "
+    "fact, quoting only figures that fact states; if the facts are thin or unavailable, leave "
+    "outlook empty and outlook_leaning as an empty string. Never give advice or a forecast "
+    "number of your own. If the evidence block names a part of the question that is not "
+    "answered, do not answer that part and do not mention it in the answer."
 )
 LIVE_ROUTES = {"live_price", "both"}
 
@@ -309,6 +316,10 @@ def _evidence_block(state: AgentState) -> str:
         parts.append(
             "Tickers the question refers to (resolved from the user's wording, which may be a "
             f"company name or contain typos): {', '.join(route.tickers)}")
+    if route is not None and route.wants_outlook:
+        parts.append("An outlook was requested: fill outlook_leaning and outlook as instructed.")
+    if route is not None and route.declined_part:
+        parts.append(f"Not answered (out of scope): {route.declined_part}")
     parts.append(f"{label}Portfolio (JSON):\n{state.get('portfolio_json', '{}')}")
     graded = state.get("graded", [])
     if graded:
@@ -325,16 +336,22 @@ def _evidence_block(state: AgentState) -> str:
     return "\n\n".join(parts)
 
 
+def _idk(state: AgentState) -> Memo:
+    memo = idk_memo()
+    route = state.get("route")
+    return memo.model_copy(update={"declined": route.declined_part}) if route is not None else memo
+
+
 def synthesize_node(state: AgentState, deps: Deps) -> dict:
     route = state["route"].route
     graded = state.get("graded", [])
     quotes = state.get("quotes", {})
     has_price = any(q.price is not None for q in quotes.values())
     has_facts = bool(state.get("facts"))
-    if (route in FILING_ROUTES or route in LIVE_ROUTES or route == "analysis") and not (
+    if (route in FILING_ROUTES or route in LIVE_ROUTES or route in ("analysis", "agent")) and not (
         graded or has_price or has_facts
     ):
-        return {"memo": idk_memo(), "trace": ["Synthesizer: no supporting evidence, so \"I don't know\""]}
+        return {"memo": _idk(state), "trace": ["Synthesizer: no supporting evidence, so \"I don't know\""]}
 
     history = [
         {"role": m["role"], "content": m["content"][: ai.MAX_MESSAGE_CHARS]}
@@ -348,25 +365,36 @@ def synthesize_node(state: AgentState, deps: Deps) -> dict:
     try:
         memo = ask_structured(messages, Memo, deps.model, deps.client)
     except ai.AIError as exc:
-        return {"memo": idk_memo(), "trace": [f"Synthesizer failed ({exc})"]}
+        return {"memo": _idk(state), "trace": [f"Synthesizer failed ({exc})"]}
 
     labels = labels_for(state)
+    decision = state["route"]
+    outlook = cited_reasons(list(memo.outlook), labels) if decision.wants_outlook else []
     texts = [memo.answer, *memo.key_figures, *memo.sources, *memo.unverified]
     if memo.answer.strip() == ai.IDK_MESSAGE or any(ai.grounded(t, labels) == ai.IDK_MESSAGE for t in texts):
-        return {"memo": idk_memo(), "trace": ["Synthesizer: unsupported citation or no answer, so \"I don't know\""]}
+        return {"memo": _idk(state), "trace": ["Synthesizer: unsupported citation or no answer, so \"I don't know\""]}
 
     unverified = list(memo.unverified)
     evidence = _evidence_block(state)
     unverified += [
         f"The figure {n} could not be matched to a supplied source"
-        for n in check_numbers([memo.answer, *memo.key_figures], evidence)
+        for n in check_numbers([memo.answer, *memo.key_figures, *outlook], evidence)
     ]
     unverified += [f"Live price for {t} was unavailable" for t, q in quotes.items() if q.price is None]
-    if route in FILING_ROUTES and not graded:
+    if (route in FILING_ROUTES or (route == "agent" and state.get("searched_filings"))) and not graded:
         unverified.append("No relevant SEC filing passages were found")
+    facts = state.get("facts", [])
+    thin = bool(facts) and all("unavailable" in f.text for f in facts)
+    leaning = memo.outlook_leaning if outlook and not thin else ""
+    if decision.wants_outlook and not leaning:
+        outlook = []
+        unverified.append("The analyst data was insufficient to give an outlook")
+    if state.get("step_limit_hit"):
+        unverified.append("The agent stopped at its step limit, so evidence may be incomplete")
     return {
-        "memo": Memo(answer=memo.answer, key_figures=memo.key_figures,
-                     sources=memo.sources, unverified=unverified),
+        "memo": Memo(answer=memo.answer, key_figures=memo.key_figures, sources=memo.sources,
+                     unverified=unverified, outlook=outlook, outlook_leaning=leaning,
+                     declined=decision.declined_part),
         "trace": ["Synthesizer: memo written from supplied evidence"],
     }
 

@@ -30,20 +30,42 @@ def labels_for(state) -> set[str]:
     return labels
 
 
+_LAST_BRACKET = re.compile(r"\[([^\[\]]+)\]\W*$")
+OUTLOOK_TITLE = "Outlook (Estimate based on the data above, not a filing fact and not financial advice)"
+
+
+def cited_reasons(reasons: list[str], labels: set[str]) -> list[str]:
+    """Keep only reasons that end with a bracketed label that was actually supplied."""
+    kept = []
+    for reason in reasons:
+        m = _LAST_BRACKET.search(reason)
+        if m and m.group(1) in labels:
+            kept.append(reason)
+    return kept
+
+
 def render_memo(memo: Memo) -> str:
+    declined = f"_Not answered: {memo.declined}_" if memo.declined else ""
     if memo.answer == ai.IDK_MESSAGE:
-        return ai.IDK_MESSAGE
+        return "\n\n".join(p for p in (ai.IDK_MESSAGE, declined) if p)
 
     def section(title: str, items: list[str]) -> str:
         body = "\n".join(f"- {i}" for i in items) if items else "- None"
         return f"### {title}\n{body}"
 
-    return "\n\n".join([
+    parts = [
         f"### Answer\n{memo.answer}",
         section("Key figures", memo.key_figures),
         section("Sources", memo.sources),
         section("What I couldn't verify", memo.unverified),
-    ])
+    ]
+    if memo.outlook or memo.outlook_leaning:
+        leaning = f"Leaning: {memo.outlook_leaning}\n" if memo.outlook_leaning else ""
+        body = "\n".join(f"- {r}" for r in memo.outlook)
+        parts.insert(3, f"### {OUTLOOK_TITLE}\n{leaning}{body}")
+    if declined:
+        parts.append(declined)
+    return "\n\n".join(parts)
 
 
 _CITATION_OR_DATE = re.compile(r"\[[^\]]*\]|\d{4}-\d{2}-\d{2}")

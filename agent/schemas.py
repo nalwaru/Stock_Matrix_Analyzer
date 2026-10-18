@@ -35,6 +35,9 @@ class Memo(BaseModel):
     key_figures: list[str]
     sources: list[str]
     unverified: list[str]
+    outlook: list[str] = []  # reasons, each ending with a supplied [label]
+    outlook_leaning: Literal["", "positive", "neutral", "cautious"] = ""
+    declined: str = ""  # set from the gate, never by the model
 
 
 class CalcCall(BaseModel):
