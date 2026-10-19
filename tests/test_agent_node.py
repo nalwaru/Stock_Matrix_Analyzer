@@ -8,8 +8,8 @@ from tests.test_agent_analysis_node import FakeData
 from tests.test_agent_portfolio_tools import frame
 
 
-def state(tickers=("AAPL",), outlook=False, filings=False):
-    return {"question": "What is Apple's profit?", "today": "2026-10-18", "history": [],
+def state(tickers=("AAPL",), outlook=False, filings=False, question="What is Apple's profit?"):
+    return {"question": question, "today": "2026-10-18", "history": [],
             "held_tickers": ["AAPL", "NVDA"], "portfolio_json": "{}",
             "route": RouteDecision(route="agent", tickers=list(tickers), reason="r", wants_outlook=outlook,
                                    about_filings=filings)}
@@ -208,3 +208,36 @@ def test_questions_not_about_filings_are_unchanged():
     client, deps = deps_with([assistant(tool_calls=[analysts_call()]), assistant("done")])
     out = agent_node(state(filings=False), deps)
     assert out["graded"] == [] and analyst_facts(out) and not out.get("searched_filings")
+
+
+MY_QUESTION = "How is my Apple position exposed to the risks in its 10-K?"
+
+
+def holding_facts(out):
+    return [f for f in out["facts"] if f.label.startswith("PORTFOLIO calc") and "holding" in f.label]
+
+
+def test_my_position_on_a_held_ticker_also_looks_up_the_holding():
+    client, deps = deps_with([assistant("done")])
+    out = agent_node(state(filings=True, question=MY_QUESTION), deps)
+    assert holding_facts(out) and out["graded"]  # both the holding and the filings evidence
+    assert any(line.startswith("Agent tool: portfolio_calc(") for line in out["trace"])
+
+
+def test_no_holding_lookup_when_the_question_does_not_say_my():
+    client, deps = deps_with([assistant("done")])
+    out = agent_node(state(filings=True, question="How is Apple exposed to the risks in its 10-K?"), deps)
+    assert holding_facts(out) == []
+
+
+def test_no_holding_lookup_for_a_ticker_the_user_does_not_hold():
+    client, deps = deps_with([assistant("done")])
+    out = agent_node(state(tickers=("ORCL",), question="How would my Oracle position look?"), deps)
+    assert holding_facts(out) == []
+
+
+def test_the_model_repeating_the_holding_lookup_is_skipped():
+    call = tool_call("c1", "portfolio_calc", {"tool": "holding", "ticker": "AAPL"})
+    client, deps = deps_with([assistant(tool_calls=[call]), assistant("done")])
+    out = agent_node(state(question=MY_QUESTION), deps)
+    assert len(holding_facts(out)) == 1

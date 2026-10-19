@@ -1,5 +1,6 @@
 """The tool-calling agent: gathers evidence with tools, then hands off to the writer."""
 import json
+import re
 import time
 
 from agent.agent_tools import TOOL_SPECS, run_tool
@@ -9,6 +10,7 @@ from agent.state import AgentState
 from analyzer import ai
 
 MAX_AGENT_TOOL_CALLS = 6
+_MY = re.compile(r"\bmy\b", re.IGNORECASE)  # the question is about the user's own position
 MAX_AGENT_TURNS = 4
 OUTLOOK_KINDS = ["fundamental", "risk", "ownership"]  # technical only when the question asks
 MAX_OUTLOOK_TICKERS = 3
@@ -111,6 +113,16 @@ def agent_node(state: AgentState, deps: Deps) -> dict:
              "function": {"name": "search_filings", "arguments": json.dumps(forced)}}]})
         messages.append({"role": "tool", "tool_call_id": "forced-filings",
                          "content": execute("search_filings", forced)})
+
+    if _MY.search(state["question"]) and deps.holdings is not None:  # "my Apple position": look it up
+        owned = set(deps.holdings["Ticker"])
+        for ticker in [t for t in route.tickers if t in owned][:MAX_OUTLOOK_TICKERS]:
+            args = {"tool": "holding", "ticker": ticker}
+            call_id = f"forced-holding-{ticker}"
+            messages.append({"role": "assistant", "content": None, "tool_calls": [
+                {"id": call_id, "type": "function",
+                 "function": {"name": "portfolio_calc", "arguments": json.dumps(args)}}]})
+            messages.append({"role": "tool", "tool_call_id": call_id, "content": execute("portfolio_calc", args)})
 
     exhausted = True
     stopped_early = False
