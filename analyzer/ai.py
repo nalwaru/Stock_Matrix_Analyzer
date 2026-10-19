@@ -7,6 +7,7 @@ import pandas as pd
 from openai import (
     APIConnectionError,
     AuthenticationError,
+    LengthFinishReasonError,
     OpenAI,
     OpenAIError,
     RateLimitError,
@@ -129,6 +130,8 @@ def build_context(df: pd.DataFrame, max_rows: int = MAX_HOLDINGS) -> str:
 
 def safe_error(exc: OpenAIError) -> AIError:
     """Map any OpenAI failure to a message that is safe to show (no provider text)."""
+    if isinstance(exc, LengthFinishReasonError):
+        return AIError("The answer was too long to finish. Try a narrower question.")
     if isinstance(exc, AuthenticationError):
         return AIError("The OpenAI API key was rejected. Check OPENAI_API_KEY.")
     if isinstance(exc, RateLimitError):

@@ -195,3 +195,9 @@ def test_safe_error_names_exhausted_credits_without_blaming_openai():
 def test_the_audit_feature_is_gone():
     for name in ("AUDIT_SYSTEM_PROMPT", "build_audit_messages", "generate_audit", "audit"):
         assert not hasattr(ai, name), name
+
+
+def test_a_truncated_answer_is_reported_as_too_long_not_as_a_generic_openai_failure():
+    exc = openai.LengthFinishReasonError(completion=NS(usage=None, choices=[]))
+    message = str(ai.safe_error(exc))
+    assert "too long" in message.lower() and "OpenAI could not" not in message

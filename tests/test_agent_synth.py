@@ -120,3 +120,84 @@ def test_writer_prompt_forbids_attaching_portfolio_wide_figures_to_a_named_compa
     from agent.nodes import SYNTH_PROMPT
     text = SYNTH_PROMPT.lower()
     assert "whole portfolio" in text and "never attribute" in text
+
+
+class RecordingClient:
+    """parse() returns scripted Memos in order and records the messages it was sent."""
+
+    def __init__(self, memos):
+        self.memos, self.sent = list(memos), []
+        from types import SimpleNamespace as NS
+        self.chat = NS(completions=NS(parse=self._parse))
+
+    def _parse(self, **kwargs):
+        from types import SimpleNamespace as NS
+        self.sent.append(kwargs["messages"])
+        return NS(choices=[NS(message=NS(parsed=self.memos.pop(0), refusal=None))])
+
+
+GOOD_LABEL = "PORTFOLIO calc, 2026-10-19, weight_Crypto"
+
+
+def calc_state():
+    from agent.state import Fact
+    s = state("portfolio_only")
+    s["facts"] = [Fact(GOOD_LABEL, "Crypto: 31.77% of the portfolio")]
+    return s
+
+
+def test_unsupported_citation_gets_one_retry_with_the_valid_labels():
+    bad = memo("Crypto is 31.77% [PORTFOLIO calc, 2026-10-19, class_weight_Crypto].")
+    good = memo(f"Crypto is 31.77% [{GOOD_LABEL}].")
+    client = RecordingClient([bad, good])
+    out = synthesize_node(calc_state(), make_deps(client))
+    assert out["memo"].answer == good.answer and len(client.sent) == 2
+    retry_text = " ".join(m["content"] for m in client.sent[1])
+    assert GOOD_LABEL in retry_text and "class_weight_Crypto" in retry_text
+
+
+def test_two_unsupported_attempts_end_in_idk_and_the_trace_names_the_bad_citation():
+    bad = memo("Crypto is 31.77% [PORTFOLIO calc, 2026-10-19, class_weight_Crypto].")
+    client = RecordingClient([bad, bad])
+    out = synthesize_node(calc_state(), make_deps(client))
+    assert out["memo"].answer == ai.IDK_MESSAGE and len(client.sent) == 2
+    assert "class_weight_Crypto" in out["trace"][0]
+
+
+def test_a_writer_that_honestly_says_idk_is_not_retried():
+    client = RecordingClient([Memo(answer=ai.IDK_MESSAGE, key_figures=[], sources=[], unverified=[])])
+    out = synthesize_node(calc_state(), make_deps(client))
+    assert out["memo"].answer == ai.IDK_MESSAGE and len(client.sent) == 1
+    assert "no supported answer" in out["trace"][0].lower()
+
+
+def test_the_writer_gets_a_somewhat_larger_but_bounded_output_cap():
+    from agent.nodes import WRITER_MAX_TOKENS
+    assert ai.MAX_OUTPUT_TOKENS < WRITER_MAX_TOKENS <= 2000  # room for a long memo, but a bounded runaway
+    seen = []
+
+    class Capture(RecordingClient):
+        def _parse(self, **kwargs):
+            seen.append(kwargs["max_tokens"])
+            return super()._parse(**kwargs)
+
+    good = memo(f"Crypto is 31.77% [{GOOD_LABEL}].")
+    synthesize_node(calc_state(), make_deps(Capture([good])))
+    assert seen == [WRITER_MAX_TOKENS]
+
+
+def test_writer_prompt_asks_for_compact_json_to_prevent_whitespace_runaways():
+    from agent.nodes import SYNTH_PROMPT
+    assert "compact JSON" in SYNTH_PROMPT and "whitespace" in SYNTH_PROMPT
+
+
+def test_the_retry_shows_the_whole_previous_memo_and_asks_to_keep_every_field():
+    bad = Memo(answer="Crypto is 31.77% [PORTFOLIO calc, 2026-10-19, class_weight_Crypto].", key_figures=["k"],
+               sources=[], unverified=[], outlook=["kept reason"], outlook_leaning="neutral")
+    good = memo(f"Crypto is 31.77% [{GOOD_LABEL}].")
+    client = RecordingClient([bad, good])
+    out = synthesize_node(calc_state(), make_deps(client))
+    retry_text = " ".join(m["content"] or "" for m in client.sent[1])
+    assert "kept reason" in retry_text and "outlook_leaning" in retry_text
+    assert "keep every other field" in retry_text.lower()
+    assert any("retried" in line.lower() for line in out["trace"])

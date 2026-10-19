@@ -94,3 +94,45 @@ def test_chat_with_tools_requires_key_when_no_client(monkeypatch):
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     with pytest.raises(ai.AIError):
         llm.chat_with_tools(MESSAGES, [], "m")
+
+
+def test_ask_structured_uses_the_default_output_cap_unless_a_larger_one_is_given():
+    client = FakeClient(parsed=Answer(value=1))
+    llm.ask_structured(MESSAGES, Answer, "m", client=client)
+    assert client.calls[0]["max_tokens"] == ai.MAX_OUTPUT_TOKENS
+    llm.ask_structured(MESSAGES, Answer, "m", client=client, max_tokens=2500)
+    assert client.calls[1]["max_tokens"] == 2500
+
+
+class LengthThenOk:
+    """parse() raises LengthFinishReasonError for the first `failures` calls, then succeeds."""
+
+    def __init__(self, failures):
+        self.failures, self.calls = failures, []
+        self.chat = NS(completions=NS(parse=self._parse))
+
+    def _parse(self, **kwargs):
+        self.calls.append(kwargs)
+        if len(self.calls) <= self.failures:
+            raise openai.LengthFinishReasonError(completion=NS(usage=None, choices=[]))
+        return NS(choices=[NS(message=NS(parsed=Answer(value=7), refusal=None))])
+
+
+def test_a_runaway_completion_is_retried_once():
+    client = LengthThenOk(failures=1)
+    assert llm.ask_structured(MESSAGES, Answer, "m", client=client) == Answer(value=7)
+    assert len(client.calls) == 2
+
+
+def test_two_runaway_completions_end_in_a_clear_too_long_error():
+    client = LengthThenOk(failures=2)
+    with pytest.raises(ai.AIError, match="too long"):
+        llm.ask_structured(MESSAGES, Answer, "m", client=client)
+    assert len(client.calls) == 2
+
+
+def test_other_openai_errors_are_not_retried():
+    client = FakeClient(error=openai.OpenAIError("boom"))
+    with pytest.raises(ai.AIError):
+        llm.ask_structured(MESSAGES, Answer, "m", client=client)
+    assert len(client.calls) == 1

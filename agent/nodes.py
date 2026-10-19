@@ -65,6 +65,7 @@ NEXT_NODE = {
 }
 MAX_HELD_DEFAULT = 3
 GATE_ATTEMPTS = 2
+WRITER_MAX_TOKENS = 1500  # a long memo needs ~900; the cap also bounds a rare runaway completion
 REASON_CHARS = 90  # the gate's free-text reason is only a trace note, so keep it short
 
 
@@ -345,7 +346,9 @@ SYNTH_PROMPT = (
     "fact, quoting only figures that fact states; if the facts are thin or unavailable, leave "
     "outlook empty and outlook_leaning as an empty string. Never give advice or a forecast "
     "number of your own. If the evidence block names a part of the question that is not "
-    "answered, do not answer that part and do not mention it in the answer."
+    "answered, do not answer that part and do not mention it in the answer. "
+    # measured: without this line about 6 in 10 outlook memos ran away into blank space until the cap
+    "Reply with compact JSON: no blank lines, no indentation, no padding or trailing whitespace anywhere."
 )
 
 
@@ -386,6 +389,21 @@ def _idk(state: AgentState) -> Memo:
     return memo.model_copy(update=update)
 
 
+def _memo_texts(memo: Memo) -> list[str]:
+    return [memo.answer, *memo.key_figures, *memo.sources, *memo.unverified]
+
+
+def _unsupported_citations(texts: list[str], labels: set[str]) -> list[str]:
+    """Filing-style citations in `texts` whose label was never supplied, in order, without repeats."""
+    bad: list[str] = []
+    for text in texts:
+        for ticker, form, filed, section in ai.CITATION.findall(text):
+            label = f"{ticker} {form}, {filed}, {section}"
+            if label not in labels and label not in bad:
+                bad.append(label)
+    return bad
+
+
 def synthesize_node(state: AgentState, deps: Deps) -> dict:
     route = state["route"].route
     graded = state.get("graded", [])
@@ -407,17 +425,35 @@ def synthesize_node(state: AgentState, deps: Deps) -> dict:
         {"role": "user", "content": f"{_evidence_block(state)}\n\nQuestion: {state['question']}"},
     ]
     try:
-        memo = ask_structured(messages, Memo, deps.model, deps.client)
+        memo = ask_structured(messages, Memo, deps.model, deps.client, max_tokens=WRITER_MAX_TOKENS)
     except ai.AIError as exc:
         return {"memo": _idk(state), "trace": [f"Synthesizer failed ({exc})"]}
 
     labels = labels_for(state)
+    bad = _unsupported_citations(_memo_texts(memo), labels)
+    if bad and memo.answer.strip() != ai.IDK_MESSAGE:  # one retry, told exactly which labels exist
+        hint = (f"Your memo cited labels that were not supplied: {bad}. Return the same memo with those "
+                f"citations replaced, using ONLY these labels, copied exactly: {sorted(labels)}. Keep every "
+                "other field as it was, including outlook and outlook_leaning.")
+        retry = [*messages, {"role": "assistant", "content": memo.model_dump_json()},
+                 {"role": "user", "content": hint}]
+        retried = bad
+        try:
+            memo = ask_structured(retry, Memo, deps.model, deps.client, max_tokens=WRITER_MAX_TOKENS)
+        except ai.AIError as exc:
+            return {"memo": _idk(state), "trace": [f"Synthesizer retry failed ({exc})"]}
+        bad = _unsupported_citations(_memo_texts(memo), labels)
+    else:
+        retried = []
+    retry_note = f"retried after unsupported citation [{retried[0]}]; " if retried else ""
     decision = state["route"]
     usable = analyst_labels(state.get("facts", []))
     outlook = cited_reasons(list(memo.outlook), usable) if decision.wants_outlook else []
-    texts = [memo.answer, *memo.key_figures, *memo.sources, *memo.unverified]
-    if memo.answer.strip() == ai.IDK_MESSAGE or any(ai.grounded(t, labels) == ai.IDK_MESSAGE for t in texts):
-        return {"memo": _idk(state), "trace": ["Synthesizer: unsupported citation or no answer, so \"I don't know\""]}
+    if memo.answer.strip() == ai.IDK_MESSAGE:
+        return {"memo": _idk(state), "trace": ["Synthesizer: the writer found no supported answer, so \"I don't know\""]}
+    if bad:
+        shown = ", ".join(f"[{b}]" for b in bad[:2])
+        return {"memo": _idk(state), "trace": [f"Synthesizer: {retry_note}unsupported citation {shown}, so \"I don't know\""]}
 
     unverified = list(memo.unverified)
     evidence = _evidence_block(state)
@@ -443,7 +479,7 @@ def synthesize_node(state: AgentState, deps: Deps) -> dict:
         "memo": Memo(answer=memo.answer, key_figures=memo.key_figures, sources=memo.sources,
                      unverified=unverified, outlook=outlook, outlook_leaning=leaning,
                      declined=decision.declined_part),
-        "trace": ["Synthesizer: memo written from supplied evidence"],
+        "trace": [f"Synthesizer: {retry_note}memo written from supplied evidence"],
     }
 
 
