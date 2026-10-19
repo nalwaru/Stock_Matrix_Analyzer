@@ -11,6 +11,8 @@ cp .env.example .env   # then add your OPENAI_API_KEY (optional; Ask AI tab is d
 uv run streamlit run app.py
 ```
 
+For Ask AI (prerequisites, keys, the filing index, what changed and troubleshooting), see [docs/ASK_AI.md](docs/ASK_AI.md).
+
 ## CSV format
 
 Required columns: `Ticker, Shares, Purchase_Price, Purchase_Date, Asset_Class`.
@@ -33,7 +35,7 @@ uv run pytest
 
 ## Filings-grounded Ask AI (optional)
 
-Ask AI can cite SEC filings (latest 10-K, last 3 10-Qs, last 90 days of 8-Ks) for AAPL (add more tickers to `INDEXED_TICKERS` in `rag/store.py`, then re-run the loader).
+Ask AI can cite SEC filings (latest 10-K, last 3 10-Qs, last 90 days of 8-Ks) for AAPL and RIVN (add more tickers to `INDEXED_TICKERS` in `rag/store.py`, then re-run the loader).
 
 1. Set `SEC_USER_AGENT="Your Name you@example.com"` (EDGAR requires it) and `PINECONE_API_KEY` in `.env`.
 2. Build the indexes once: `uv run python -m rag.build_index` (creates `filings-dense` and `filings-sparse` with namespaces `fixed` and `semantic`; re-running overwrites, it does not duplicate).
@@ -52,7 +54,7 @@ Every Ask AI question runs through a LangGraph graph (`agent/`). A **gate** (the
 All tool results are computed in Python and returned as cited facts; the model only writes the memo.
 - **Portfolio calculator** (`portfolio_only` route): holding, asset-class weight, top-N, totals and what-if stress, chosen by a planner call (max 3 calls).
 - **Price history** (price path): 1-day, 1-week and 1-month changes from Yahoo.
-- **Analysts** (`analysis` route, max 3 tickers): technical (SMA/EMA, RSI, MACD, Bollinger, ATR, volume, 52-week range, support/resistance), risk (volatility, beta vs SPY, drawdown, Sharpe at an assumed 4% risk-free rate, correlations), fundamental (valuation, margins, growth, debt, cash flow, dividend) and ownership (consensus, price targets, rating changes, holders, insiders, earnings date). Data is Yahoo Finance via `yfinance` (unofficial; missing fields show as "unavailable").
+- **Analysts** (`run_analysts` tool on the agent path, max 3 tickers; technical only when asked): technical (SMA/EMA, RSI, MACD, Bollinger, ATR, volume, 52-week range, support/resistance), risk (volatility, beta vs SPY, drawdown, Sharpe at an assumed 4% risk-free rate, correlations), fundamental (valuation, margins, growth, debt, cash flow, dividend) and ownership (consensus, price targets, rating changes, holders, insiders, earnings date). Data is Yahoo Finance via `yfinance` (unofficial; missing fields show as "unavailable").
 - **Number checker:** figures in a memo that appear in no supplied source are listed under "What I couldn't verify". RSI/ATR use Wilder smoothing seeded from the first value, so they can differ slightly from charting sites.
 
 A technical analysis answer also draws a chart (price with SMA20/50/200 and Bollinger band, volume, RSI with 30/70 lines, MACD with signal and histogram). The chart and the cited facts use the same indicator formulas (`agent/analysts/technical.py`).
