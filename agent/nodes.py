@@ -85,17 +85,14 @@ def _gate_call(messages: list[dict], model: str, client, extra_body=None) -> Rou
                 raise
 
 
-def _ask_gate(messages: list[dict], deps: Deps) -> tuple[RouteDecision, str]:
-    """Ask the gate; if the router model keeps failing, the main model answers.
+def _ask_gate(messages: list[dict], deps: Deps) -> RouteDecision:
+    """Ask the gate: the router model when one is configured, otherwise the main model.
 
-    Returns (decision, note); the note is empty unless the fallback was used."""
-    if not deps.router_model:
-        return _gate_call(messages, deps.model, deps.client), ""
-    try:
-        return _gate_call(messages, deps.router_model, deps.router_client, OPENROUTER_BODY), ""
-    except ai.AIError as failure:
-        decision = _gate_call(messages, deps.model, deps.client)
-        return decision, f"router model failed ({failure}); fallback to the OpenAI model"
+    There is no failover between them; a router model that keeps failing ends in the
+    'routing failed' path in router_node."""
+    if deps.router_model:
+        return _gate_call(messages, deps.router_model, deps.router_client, OPENROUTER_BODY)
+    return _gate_call(messages, deps.model, deps.client)
 
 
 def router_node(state: AgentState, deps: Deps) -> dict:
@@ -109,7 +106,7 @@ def router_node(state: AgentState, deps: Deps) -> dict:
         )},
     ]
     try:
-        decision, note = _ask_gate(messages, deps)
+        decision = _ask_gate(messages, deps)
     except ai.AIError as exc:
         return {
             "route": RouteDecision(route="portfolio_only", tickers=[], reason="routing failed"),
@@ -131,8 +128,6 @@ def router_node(state: AgentState, deps: Deps) -> dict:
         elif route == "agent":
             tickers = held[:MAX_HELD_DEFAULT]
     line = f"Router: {route} ({_short(decision.reason)})"
-    if note:
-        line += f"; {note}"
     if decision.about_filings:
         line += "; filings first"
     if decision.wants_outlook:

@@ -135,13 +135,15 @@ def test_router_gives_up_after_two_failures_and_falls_back():
     assert "routing failed" in out["trace"][0].lower()
 
 
-def test_gate_falls_back_to_the_openai_model_when_the_router_model_keeps_failing():
+def test_gate_never_falls_over_to_the_openai_model_when_the_router_model_fails():
     from dataclasses import replace
     broken = FakeClient(error=openai.OpenAIError("402"))
     main = FakeClient(decision("agent", ["AAPL"]))
     out = router_node(state(), replace(deps(main), router_client=broken, router_model="x/y"))
-    assert out["route"].route == "agent" and len(broken.calls) == 2 and len(main.calls) == 1
-    assert "fallback" in out["trace"][0].lower()
+    assert len(broken.calls) == 2  # one retry on the router model, then it gives up
+    assert main.calls == []  # the OpenAI client is never asked
+    assert out["route"].route == "portfolio_only" and "routing failed" in out["trace"][0].lower()
+    assert "fallback" not in out["trace"][0].lower()
 
 
 def test_gate_without_a_router_model_has_no_fallback_note():
